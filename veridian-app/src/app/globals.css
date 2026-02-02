@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+:root {
+  /* Core Brand Colors */
+  --veridian-primary: #00FF94;
+  /* High-visibility spring green - energetic/vibrant */
+  --veridian-glow: rgba(0, 255, 148, 0.4);
+  --veridian-dark: #0A1F13;
+  /* Deep forest green / Near Black */
+  --veridian-black: #050A07;
+  /* Base background */
+  --veridian-accent: #2E8B57;
+  /* SeaGreen for depth */
+
+  /* UI System Colors */
+  --background: var(--veridian-black);
+  --foreground: #E0F2E9;
+  /* Soft pale green/white for text */
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(0, 255, 148, 0.15);
+
+  /* Typography */
+  --font-heading: var(--font-outfit);
+  --font-body: var(--font-sora);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  /* Atmosphere: Deep radial gradient to simulate depth/forest canopy at night */
+  background-image:
+    radial-gradient(circle at 50% -20%, #1a3d2b 0%, transparent 60%),
+    linear-gradient(to bottom, var(--veridian-black), #020503);
+  background-attachment: fixed;
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--veridian-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--veridian-accent);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--veridian-primary);
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #ffffff 0%, var(--veridian-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-text {
+  text-shadow: 0 0 20px var(--veridian-glow);
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
