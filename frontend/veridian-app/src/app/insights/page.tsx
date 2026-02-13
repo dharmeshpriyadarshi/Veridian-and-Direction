@@ -50,7 +50,7 @@ export default function InsightsPage() {
     };
 
     const getStatus = (aqi: number) => {
-        if (aqi <= 50) return { label: "Good", color: "text-[#00FF94]" };
+        if (aqi <= 50) return { label: "Good", color: "text-veridian-primary" };
         if (aqi <= 100) return { label: "Moderate", color: "text-yellow-400" };
         if (aqi <= 150) return { label: "Unhealthy (Sensitive)", color: "text-orange-400" };
         if (aqi <= 200) return { label: "Unhealthy", color: "text-red-500" };
@@ -59,13 +59,13 @@ export default function InsightsPage() {
     };
 
     return (
-        <main className="min-h-screen bg-black text-white relative">
+        <main className="min-h-screen bg-veridian-black text-foreground relative">
             <Navbar />
 
             {/* Background Atmosphere */}
             <div className="fixed inset-0 pointer-events-none">
-                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#00FF94] opacity-[0.02] blur-[150px] rounded-full" />
-                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#2E8B57] opacity-[0.04] blur-[120px] rounded-full" />
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-veridian-primary opacity-[0.02] blur-[150px] rounded-full" />
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-veridian-accent opacity-[0.04] blur-[120px] rounded-full" />
             </div>
 
             <div className="pt-32 px-4 max-w-7xl mx-auto relative z-10">
@@ -76,7 +76,7 @@ export default function InsightsPage() {
                 >
                     <div>
                         <h1 className="text-5xl md:text-6xl font-bold mb-4">Live Insights</h1>
-                        <div className="flex items-center gap-2 text-white/50">
+                        <div className="flex items-center gap-2 text-foreground/50">
                             <MapPin size={18} />
                             <span className="uppercase tracking-widest text-sm">
                                 {data ? data.location : "Locating..."}
@@ -91,15 +91,15 @@ export default function InsightsPage() {
                             placeholder="Search City (e.g. Mumbai, London)"
                             value={city}
                             onChange={(e) => setCity(e.target.value)}
-                            className="w-full bg-white/5 border border-white/20 rounded-full px-6 py-3 pl-12 text-white placeholder:text-white/30 focus:outline-none focus:border-[#00FF94] transition-colors"
+                            className="w-full bg-foreground/5 border border-foreground/20 rounded-full px-6 py-3 pl-12 text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-veridian-primary transition-colors"
                         />
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/30" size={18} />
                     </form>
                 </motion.div>
 
                 {loading ? (
                     <div className="flex h-64 items-center justify-center">
-                        <div className="w-12 h-12 border-2 border-[#00FF94] border-t-transparent rounded-full animate-spin" />
+                        <div className="w-12 h-12 border-2 border-veridian-primary border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : error ? (
                     <div className="text-red-400 p-8 border border-red-500/30 rounded-2xl bg-red-500/10">
@@ -119,7 +119,7 @@ export default function InsightsPage() {
                                 <Activity size={200} />
                             </div>
 
-                            <h2 className="text-xl font-medium text-white/70 mb-2">Air Quality Index</h2>
+                            <h2 className="text-xl font-medium text-foreground/70 mb-2">Air Quality Index</h2>
                             <div className="flex items-end gap-4 mb-6">
                                 <span className={`text-8xl font-bold ${getStatus(data.aqi).color}`}>{data.aqi}</span>
                                 <span className={`text-2xl pb-4 font-medium ${getStatus(data.aqi).color}`}>{getStatus(data.aqi).label}</span>
@@ -131,9 +131,9 @@ export default function InsightsPage() {
                                     { label: "PM10", value: data.pm10, unit: "µg/m³" },
                                     { label: "NO₂", value: data.no2, unit: "ppb" },
                                 ].map((item, i) => (
-                                    <div key={i} className="bg-white/5 p-4 rounded-xl">
-                                        <p className="text-xs text-white/50 uppercase tracking-wider mb-1">{item.label}</p>
-                                        <p className="text-xl font-semibold">{item.value} <span className="text-sm font-normal text-white/40">{item.unit}</span></p>
+                                    <div key={i} className="bg-foreground/5 p-4 rounded-xl">
+                                        <p className="text-xs text-foreground/50 uppercase tracking-wider mb-1">{item.label}</p>
+                                        <p className="text-xl font-semibold">{item.value} <span className="text-sm font-normal text-foreground/40">{item.unit}</span></p>
                                     </div>
                                 ))}
                             </div>
@@ -148,19 +148,19 @@ export default function InsightsPage() {
                                 className="glass-panel p-8 rounded-3xl flex items-center justify-between"
                             >
                                 <div>
-                                    <h3 className="text-lg text-white/60 mb-1">Current Weather</h3>
+                                    <h3 className="text-lg text-foreground/60 mb-1">Current Weather</h3>
                                     <div className="text-4xl font-bold flex items-center gap-4">
                                         {data.temp}°C
-                                        <span className="text-base font-normal px-3 py-1 bg-white/10 rounded-full">{data.condition}</span>
+                                        <span className="text-base font-normal px-3 py-1 bg-foreground/10 rounded-full">{data.condition}</span>
                                     </div>
                                 </div>
-                                <div className="flex gap-6 text-white/60">
+                                <div className="flex gap-6 text-foreground/60">
                                     <div className="text-center">
-                                        <Droplets className="mx-auto mb-1 text-[#00FF94]" />
+                                        <Droplets className="mx-auto mb-1 text-veridian-primary" />
                                         <span className="text-sm">{data.humidity}%</span>
                                     </div>
                                     <div className="text-center">
-                                        <Wind className="mx-auto mb-1 text-[#00FF94]" />
+                                        <Wind className="mx-auto mb-1 text-veridian-primary" />
                                         <span className="text-sm">{data.windSpeed} km/h</span>
                                     </div>
                                 </div>
@@ -170,21 +170,21 @@ export default function InsightsPage() {
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.3 }}
-                                className={`glass-panel p-8 rounded-3xl border-l-4 ${data.aqi > 150 ? 'border-l-[#FF4C4C]' : 'border-l-[#00FF94]'}`}
+                                className={`glass-panel p-8 rounded-3xl border-l-4 ${data.aqi > 150 ? 'border-l-[#FF4C4C]' : 'border-l-veridian-primary'}`}
                             >
                                 <div className="flex items-start gap-4">
-                                    <AlertTriangle className={data.aqi > 150 ? 'text-[#FF4C4C]' : 'text-[#00FF94]'} size={24} />
+                                    <AlertTriangle className={data.aqi > 150 ? 'text-[#FF4C4C]' : 'text-veridian-primary'} size={24} />
                                     <div>
                                         <h3 className="text-lg font-bold mb-2">Health Advisory</h3>
-                                        <p className="text-white/70 leading-relaxed">
+                                        <p className="text-foreground/70 leading-relaxed">
                                             {data.aqi > 150
                                                 ? "Pollution levels are hazardous. Avoid outdoor activities. Wear a mask if stepping out is necessary."
                                                 : "Air quality is acceptable. It is safe for outdoor activities for most people."}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="mt-6 border-t border-white/10 pt-6">
-                                    <a href={`/simulate?aqi=${data.aqi}`} className="w-full block text-center py-3 rounded-xl bg-[#00FF94] text-[#050A07] font-bold hover:scale-105 transition-transform">
+                                <div className="mt-6 border-t border-foreground/10 pt-6">
+                                    <a href={`/simulate?aqi=${data.aqi}`} className="w-full block text-center py-3 rounded-xl bg-veridian-primary text-veridian-black font-bold hover:scale-105 transition-transform">
                                         Simulate Mitigation
                                     </a>
                                 </div>

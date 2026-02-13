@@ -11,6 +11,12 @@ const config: Config = {
             colors: {
                 background: "var(--background)",
                 foreground: "var(--foreground)",
+                veridian: {
+                    primary: "var(--veridian-primary)",
+                    dark: "var(--veridian-dark)",
+                    black: "var(--veridian-black)",
+                    accent: "var(--veridian-accent)",
+                },
             },
         },
     },

@@ -2,22 +2,22 @@
 
 :root {
   /* Core Brand Colors */
-  --veridian-primary: #00FF94;
-  /* High-visibility spring green - energetic/vibrant */
-  --veridian-glow: rgba(0, 255, 148, 0.4);
-  --veridian-dark: #0A1F13;
-  /* Deep forest green / Near Black */
-  --veridian-black: #050A07;
-  /* Base background */
-  --veridian-accent: #2E8B57;
-  /* SeaGreen for depth */
+  --veridian-primary: #CFBB99;
+  /* Sand/Beige - Highlights */
+  --veridian-glow: rgba(207, 187, 153, 0.4);
+  --veridian-dark: #4C3D19;
+  /* Dark Brown - Secondary/Deep */
+  --veridian-black: #354024;
+  /* Dark Green - Base Background */
+  --veridian-accent: #889063;
+  /* Muted Green - Depth/Borders */
 
   /* UI System Colors */
   --background: var(--veridian-black);
-  --foreground: #E0F2E9;
-  /* Soft pale green/white for text */
-  --card-bg: rgba(255, 255, 255, 0.03);
-  --card-border: rgba(0, 255, 148, 0.15);
+  --foreground: #E5D7C4;
+  /* Light Beige - Text */
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-border: var(--veridian-accent);
 
   /* Typography */
   --font-heading: var(--font-outfit);
@@ -27,10 +27,10 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  /* Atmosphere: Deep radial gradient to simulate depth/forest canopy at night */
+  /* Atmosphere: Deep organic gradient */
   background-image:
-    radial-gradient(circle at 50% -20%, #1a3d2b 0%, transparent 60%),
-    linear-gradient(to bottom, var(--veridian-black), #020503);
+    radial-gradient(circle at 50% -20%, #4C3D19 0%, transparent 60%),
+    linear-gradient(to bottom, #354024, #1a2012);
   background-attachment: fixed;
   font-family: var(--font-body);
   overflow-x: hidden;

@@ -25,7 +25,7 @@ export default function Navbar() {
         >
             <div className="glass-panel px-8 py-4 flex items-center gap-12 rounded-full">
                 {/* Logo */}
-                <Link href="/" className="text-2xl font-bold tracking-tighter text-white hover:text-[#00FF94] transition-colors">
+                <Link href="/" className="text-2xl font-bold tracking-tighter text-foreground hover:text-veridian-primary transition-colors">
                     Veridian.
                 </Link>
 
@@ -35,14 +35,14 @@ export default function Navbar() {
                         <Link
                             key={item.path}
                             href={item.path}
-                            className={`relative text-sm font-medium transition-colors hover:text-[#00FF94] ${pathname === item.path ? "text-[#00FF94]" : "text-white/70"
+                            className={`relative text-sm font-medium transition-colors hover:text-veridian-primary ${pathname === item.path ? "text-veridian-primary" : "text-foreground/70"
                                 }`}
                         >
                             {item.name}
                             {pathname === item.path && (
                                 <motion.div
                                     layoutId="underline"
-                                    className="absolute -bottom-1 left-0 right-0 h-px bg-[#00FF94]"
+                                    className="absolute -bottom-1 left-0 right-0 h-px bg-veridian-primary"
                                 />
                             )}
                         </Link>
@@ -54,8 +54,8 @@ export default function Navbar() {
                     <Link
                         href="/research"
                         className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${isResearcher
-                                ? "bg-[#00FF94] text-[#050A07] hover:bg-[#00FF94]/90"
-                                : "bg-white/5 text-white/50 border border-white/10 hover:border-[#00FF94]/50 hover:text-[#00FF94]"
+                            ? "bg-veridian-primary text-veridian-black hover:bg-veridian-primary/90"
+                            : "bg-foreground/5 text-foreground/50 border border-foreground/10 hover:border-veridian-primary/50 hover:text-veridian-primary"
                             }`}
                     >
                         {isResearcher ? (
