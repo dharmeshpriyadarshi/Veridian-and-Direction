@@ -113,11 +113,11 @@ def calculate_probabilistic_stats(df, target_date_str):
 if __name__ == "__main__":
     # Path adjustment for running from different directories
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    DATA_PATH = os.path.join(base_dir, '..', 'data', 'city_day.csv')
+    DATA_PATH = os.path.join(base_dir, '..', 'data', 'raw', 'city_day.csv')
     
     if not os.path.exists(DATA_PATH):
         # Fallback if running from root
-        DATA_PATH = os.path.join('data', 'city_day.csv')
+        DATA_PATH = os.path.join('data', 'raw', 'city_day.csv')
 
     df = load_data(DATA_PATH)
     

@@ -5,3 +5,6 @@ scikit-learn
 dtaidistance
 openaq
 python-dotenv
+fastapi
+uvicorn
+requests
