@@ -27,6 +27,7 @@ def load_data(filepath):
 def preprocess_data(df, city='Delhi'):
     """
     Filters for specific city, imputes missing values using Linear Interpolation.
+    Handles both PM2.5 and AQI columns.
     """
     print(f"Preprocessing data for {city}...")
     
@@ -40,73 +41,75 @@ def preprocess_data(df, city='Delhi'):
     # Sort by date to ensure interpolation works correctly
     city_df = city_df.sort_values('Date')
     
-    # Linear Imputation for PM2.5
-    # Limit direction='both' handles leading/trailing NaNs if reasonable
+    # Linear Imputation for PM2.5 and AQI
     city_df['PM2.5'] = city_df['PM2.5'].interpolate(method='linear', limit_direction='both')
+    if 'AQI' in city_df.columns:
+        city_df['AQI'] = city_df['AQI'].interpolate(method='linear', limit_direction='both')
     
-    # Drop any remaining NaNs if interpolation completely failed (rare)
+    # Drop rows where both are NaN
     city_df = city_df.dropna(subset=['PM2.5'])
     
     return city_df
 
+def _compute_stats_for_column(samples):
+    """Helper: compute mean, median, std, CI, percentiles for a set of samples."""
+    if len(samples) < 5:
+        return None
+    mean_val = float(np.mean(samples))
+    median_val = float(np.median(samples))
+    std_dev = float(np.std(samples))
+    ci_lower, ci_upper = stats.norm.interval(0.95, loc=mean_val, scale=std_dev/np.sqrt(len(samples)))
+    p10 = float(np.percentile(samples, 10))
+    p90 = float(np.percentile(samples, 90))
+    return {
+        "mean": round(mean_val, 2),
+        "median": round(median_val, 2),
+        "std_dev": round(std_dev, 2),
+        "ci_95": (round(float(ci_lower), 2), round(float(ci_upper), 2)),
+        "likely_range": (round(p10, 2), round(p90, 2)),
+        "sample_size": len(samples),
+    }
+
 def calculate_probabilistic_stats(df, target_date_str):
     """
     Method 1: Historical Anchor
-    Calculates Mean, Median, StdDev, and Confidence Intervals for a specific calendar day across years.
-    Target Date Format: 'YYYY-MM-DD' (Year doesn't matter for the anchor, we use Month-Day)
+    Calculates stats for BOTH AQI (primary) and PM2.5 (supplementary).
+    Target Date Format: 'YYYY-MM-DD' (Year doesn't matter, we use Month-Day)
     """
     target_date = pd.to_datetime(target_date_str)
-    month = target_date.month
-    day = target_date.day
     
-    print(f"\n--- Method 1: Analyzing Historical Anchor for {month}-{day} ---")
+    print(f"\n--- Method 1: Analyzing Historical Anchor for {target_date.month}-{target_date.day} ---")
     
-    # Create a 'Month-Day' string column for grouping
-    df['MonthDay'] = df['Date'].dt.strftime('%m-%d')
-    target_md = target_date.strftime('%m-%d')
-    
-    # Filter for this specific day across all available years (2015-2024)
-    # We broaden the window to +/- 3 days to get a more robust distribution (Smoothing)
     df['DayOfYear'] = df['Date'].dt.dayofyear
     target_doy = target_date.dayofyear
     
-    # Handle wrap-around for year end/start if needed, but simple range is usually enough for middle of year
-    # Using a 7-day rolling window center on the date to increase sample size
+    # ±3 day window
     window_mask = (df['DayOfYear'] >= target_doy - 3) & (df['DayOfYear'] <= target_doy + 3)
+    windowed = df.loc[window_mask]
     
-    historical_samples = df.loc[window_mask, 'PM2.5'].values
+    # AQI stats (primary)
+    aqi_samples = windowed['AQI'].dropna().values if 'AQI' in df.columns else np.array([])
+    aqi_stats = _compute_stats_for_column(aqi_samples) if len(aqi_samples) >= 5 else None
     
-    if len(historical_samples) < 5:
+    # PM2.5 stats (supplementary)
+    pm25_samples = windowed['PM2.5'].dropna().values
+    pm25_stats = _compute_stats_for_column(pm25_samples) if len(pm25_samples) >= 5 else None
+    
+    if aqi_stats is None and pm25_stats is None:
         print("Insufficient historical data for probabilistic analysis.")
         return None
 
-    # Calculate Statistics
-    mean_val = np.mean(historical_samples)
-    median_val = np.median(historical_samples)
-    std_dev = np.std(historical_samples)
-    
-    # Calculate 95% Confidence Interval
-    # Assuming Normal Distribution for the CI calculation (can be improved with KDE later)
-    ci_lower, ci_upper = stats.norm.interval(0.95, loc=mean_val, scale=std_dev/np.sqrt(len(historical_samples)))
-    
-    # For pollution, we often want the Prediction Interval (where a *new* observation likely falls), 
-    # not just the CI of the mean. Let's provide the 10th and 90th percentiles as a "Likely Range".
-    p10 = np.percentile(historical_samples, 10)
-    p90 = np.percentile(historical_samples, 90)
-
     stats_output = {
         "Target Date": target_date_str,
-        "Sample Size": len(historical_samples),
-        "Mean AQI": round(mean_val, 2),
-        "Median AQI": round(median_val, 2),
-        "Std Dev": round(std_dev, 2),
-        "95% CI (Mean)": (round(ci_lower, 2), round(ci_upper, 2)),
-        "Likely Range (10th-90th percentile)": (round(p10, 2), round(p90, 2))
+        "aqi": aqi_stats,
+        "pm25": pm25_stats,
     }
     
     print("\n[Historical Anchor Results]")
-    for k, v in stats_output.items():
-        print(f"{k}: {v}")
+    if aqi_stats:
+        print(f"  AQI  → Mean: {aqi_stats['mean']}, Median: {aqi_stats['median']}, Std: {aqi_stats['std_dev']}, Samples: {aqi_stats['sample_size']}")
+    if pm25_stats:
+        print(f"  PM2.5 → Mean: {pm25_stats['mean']}, Median: {pm25_stats['median']}, Std: {pm25_stats['std_dev']}, Samples: {pm25_stats['sample_size']}")
         
     return stats_output
 

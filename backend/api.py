@@ -140,11 +140,7 @@ def get_cities():
 def predict_anchor(date: str, city: str = "Delhi"):
     """
     Returns probabilistic prediction for a given date and city.
-    Includes year-by-year historical breakdown with deviation from yearly mean.
-    
-    Query params:
-      - date: YYYY-MM-DD (must be 2026)
-      - city: city name (default: Delhi)
+    Includes both AQI and PM2.5 stats, plus year-by-year breakdown.
     """
     if ml_raw_data is None:
         raise HTTPException(status_code=503, detail="ML Engine data not loaded.")
@@ -170,56 +166,95 @@ def predict_anchor(date: str, city: str = "Delhi"):
     if result is None:
         raise HTTPException(status_code=404, detail="Insufficient historical data for this date.")
     
-    # ============================================================
-    # YEAR-BY-YEAR BREAKDOWN
-    # For each year in the dataset, get:
-    #   1. The PM2.5 value for that specific day (±3 day window avg)
-    #   2. The overall yearly mean PM2.5
-    #   3. How far the day's value deviates from the year mean
-    # ============================================================
+    aqi_stats = result.get("aqi")
+    pm25_stats = result.get("pm25")
+    
+    # Use AQI as primary; fall back to PM2.5 if AQI is missing
+    primary = aqi_stats if aqi_stats else pm25_stats
+    primary_label = "AQI" if aqi_stats else "PM2.5"
+    
     month_day = parsed.strftime("%B %d")
     target_doy = parsed.dayofyear
     
+    # AQI category based on primary mean
+    mean_val = primary["mean"]
+    if mean_val <= 50:
+        category, color, severity = "Good", "#4ade80", "low"
+    elif mean_val <= 100:
+        category, color, severity = "Satisfactory", "#a3e635", "satisfactory"
+    elif mean_val <= 200:
+        category, color, severity = "Moderate", "#facc15", "moderate"
+    elif mean_val <= 300:
+        category, color, severity = "Poor", "#f97316", "high"
+    elif mean_val <= 400:
+        category, color, severity = "Very Poor", "#ef4444", "very_high"
+    else:
+        category, color, severity = "Severe", "#991b1b", "severe"
+    
+    # ============================================================
+    # YEAR-BY-YEAR BREAKDOWN — EXACT DAY VALUES (not window avg)
+    # ============================================================
     yearly_breakdown = []
     years_in_data = sorted(city_df['Date'].dt.year.unique().tolist())
+    has_aqi_col = 'AQI' in city_df.columns
+    
+    # Pre-compute DayOfYear for lookups
+    city_df_indexed = city_df.copy()
+    city_df_indexed['DayOfYear'] = city_df_indexed['Date'].dt.dayofyear
     
     for year in years_in_data:
-        year_df = city_df[city_df['Date'].dt.year == year]
+        year_df = city_df_indexed[city_df_indexed['Date'].dt.year == year]
         if year_df.empty:
             continue
         
-        # Overall stats for the ENTIRE year
-        year_mean = float(year_df['PM2.5'].mean())
-        year_median = float(year_df['PM2.5'].median())
-        year_std = float(year_df['PM2.5'].std())
+        # Year-wide stats
+        year_aqi_mean = float(year_df['AQI'].mean()) if has_aqi_col else None
+        year_aqi_std = float(year_df['AQI'].std()) if has_aqi_col else None
+        year_pm25_mean = float(year_df['PM2.5'].mean())
+        year_pm25_std = float(year_df['PM2.5'].std())
         year_total_days = len(year_df)
         
-        # The specific day's data (±3 day window for that year)
-        year_df_doy = year_df.copy()
-        year_df_doy['DayOfYear'] = year_df_doy['Date'].dt.dayofyear
-        window_mask = (year_df_doy['DayOfYear'] >= target_doy - 3) & (year_df_doy['DayOfYear'] <= target_doy + 3)
-        day_samples = year_df_doy.loc[window_mask, 'PM2.5']
+        # --- EXACT DAY lookup (not window average) ---
+        # First try the exact target day-of-year
+        exact_match = year_df[year_df['DayOfYear'] == target_doy]
         
-        if day_samples.empty:
+        if not exact_match.empty:
+            row = exact_match.iloc[0]
+            exact_date = row['Date'].strftime('%Y-%m-%d')
+        else:
+            # Fallback: nearest day within ±3 days
+            nearby = year_df[(year_df['DayOfYear'] >= target_doy - 3) & (year_df['DayOfYear'] <= target_doy + 3)]
+            if nearby.empty:
+                continue
+            # Pick the closest day
+            nearby = nearby.copy()
+            nearby['_dist'] = (nearby['DayOfYear'] - target_doy).abs()
+            row = nearby.sort_values('_dist').iloc[0]
+            exact_date = row['Date'].strftime('%Y-%m-%d')
+        
+        # Read exact values from this single row
+        day_aqi = float(row['AQI']) if has_aqi_col and not pd.isna(row['AQI']) else None
+        day_pm25 = float(row['PM2.5']) if not pd.isna(row['PM2.5']) else None
+        
+        # Deviation (using AQI as primary)
+        if day_aqi is not None and year_aqi_mean is not None:
+            deviation = day_aqi - year_aqi_mean
+            deviation_pct = ((day_aqi - year_aqi_mean) / year_aqi_mean) * 100 if year_aqi_mean != 0 else 0
+            z_score = (day_aqi - year_aqi_mean) / year_aqi_std if year_aqi_std and year_aqi_std != 0 else 0
+        elif day_pm25 is not None:
+            deviation = day_pm25 - year_pm25_mean
+            deviation_pct = ((day_pm25 - year_pm25_mean) / year_pm25_mean) * 100 if year_pm25_mean != 0 else 0
+            z_score = (day_pm25 - year_pm25_mean) / year_pm25_std if year_pm25_std != 0 else 0
+        else:
             continue
-        
-        day_mean = float(day_samples.mean())
-        day_count = len(day_samples)
-        
-        # Deviation from the year's overall mean
-        deviation = day_mean - year_mean
-        deviation_pct = ((day_mean - year_mean) / year_mean) * 100 if year_mean != 0 else 0
-        
-        # Z-score: how many standard deviations away is this day from the year mean
-        z_score = (day_mean - year_mean) / year_std if year_std != 0 else 0
         
         yearly_breakdown.append({
             "year": int(year),
-            "day_aqi": round(day_mean, 1),
-            "day_sample_count": day_count,
-            "year_mean": round(year_mean, 1),
-            "year_median": round(year_median, 1),
-            "year_std": round(year_std, 1),
+            "exact_date": exact_date,
+            "day_aqi": round(day_aqi, 1) if day_aqi is not None else None,
+            "day_pm25": round(day_pm25, 1) if day_pm25 is not None else None,
+            "year_aqi_mean": round(year_aqi_mean, 1) if year_aqi_mean is not None else None,
+            "year_pm25_mean": round(year_pm25_mean, 1),
             "year_total_days": year_total_days,
             "deviation": round(deviation, 1),
             "deviation_pct": round(deviation_pct, 1),
@@ -233,50 +268,38 @@ def predict_anchor(date: str, city: str = "Delhi"):
             )
         })
     
-    # Build response
-    mean_aqi = result["Mean AQI"]
-    median_aqi = result["Median AQI"]
-    std_dev = result["Std Dev"]
-    ci = result["95% CI (Mean)"]
-    likely_range = result["Likely Range (10th-90th percentile)"]
-    sample_size = result["Sample Size"]
-    
-    # AQI category
-    if mean_aqi <= 50:
-        category, color, severity = "Good", "#4ade80", "low"
-    elif mean_aqi <= 100:
-        category, color, severity = "Moderate", "#facc15", "moderate"
-    elif mean_aqi <= 200:
-        category, color, severity = "Unhealthy", "#f97316", "high"
-    elif mean_aqi <= 300:
-        category, color, severity = "Very Unhealthy", "#ef4444", "very_high"
-    else:
-        category, color, severity = "Hazardous", "#991b1b", "severe"
+    # Build the prediction response
+    sample_size = primary["sample_size"]
     
     return {
         "prediction": {
             "date": date,
             "city": city,
             "display_date": month_day,
-            "predicted_aqi": round(mean_aqi, 1),
-            "median_aqi": round(median_aqi, 1),
+            "primary_metric": primary_label,
+            "predicted_aqi": round(aqi_stats["mean"], 1) if aqi_stats else None,
+            "median_aqi": round(aqi_stats["median"], 1) if aqi_stats else None,
+            "predicted_pm25": round(pm25_stats["mean"], 1) if pm25_stats else None,
+            "median_pm25": round(pm25_stats["median"], 1) if pm25_stats else None,
             "category": category,
             "category_color": color,
             "severity": severity,
             "confidence_interval": {
-                "lower": round(ci[0], 1),
-                "upper": round(ci[1], 1)
+                "lower": round(primary["ci_95"][0], 1),
+                "upper": round(primary["ci_95"][1], 1)
             },
             "likely_range": {
-                "lower": round(likely_range[0], 1),
-                "upper": round(likely_range[1], 1)
+                "lower": round(primary["likely_range"][0], 1),
+                "upper": round(primary["likely_range"][1], 1)
             },
-            "std_dev": round(std_dev, 1)
+            "std_dev": round(primary["std_dev"], 1),
+            "aqi_stats": aqi_stats,
+            "pm25_stats": pm25_stats,
         },
         "yearly_breakdown": yearly_breakdown,
         "evaluation": {
             "method": "Historical Anchor (Probabilistic Distribution)",
-            "description": f"Analyzed PM2.5 readings for days around {month_day} in {city} across {len(yearly_breakdown)} years of historical data.",
+            "description": f"Analyzed AQI + PM2.5 readings for days around {month_day} in {city} across {len(yearly_breakdown)} years of historical data.",
             "steps": [
                 {
                     "step": 1,
@@ -291,7 +314,7 @@ def predict_anchor(date: str, city: str = "Delhi"):
                 {
                     "step": 3,
                     "title": "Imputation",
-                    "detail": "Missing sensor readings filled using Linear Interpolation"
+                    "detail": "Missing AQI & PM2.5 readings filled using Linear Interpolation"
                 },
                 {
                     "step": 4,
@@ -300,23 +323,28 @@ def predict_anchor(date: str, city: str = "Delhi"):
                 },
                 {
                     "step": 5,
-                    "title": "Statistical Calculation",
-                    "detail": f"Mean: {round(mean_aqi, 1)} | Median: {round(median_aqi, 1)} | Std Dev: {round(std_dev, 1)}"
+                    "title": "AQI Statistics",
+                    "detail": f"Mean: {aqi_stats['mean']} | Median: {aqi_stats['median']} | Std Dev: {aqi_stats['std_dev']}" if aqi_stats else "AQI data not available"
                 },
                 {
                     "step": 6,
-                    "title": "Year-by-Year Analysis",
-                    "detail": f"Computed deviation from each year's annual mean to show whether {month_day} is typically worse or better than the annual average"
+                    "title": "PM2.5 Statistics",
+                    "detail": f"Mean: {pm25_stats['mean']} | Median: {pm25_stats['median']} | Std Dev: {pm25_stats['std_dev']}" if pm25_stats else "PM2.5 data not available"
                 },
                 {
                     "step": 7,
-                    "title": "Confidence Interval",
-                    "detail": f"95% CI: [{round(ci[0], 1)} — {round(ci[1], 1)}]"
+                    "title": "Year-by-Year Deviation",
+                    "detail": f"Computed Z-score deviation from each year's annual mean across {len(yearly_breakdown)} years"
                 },
                 {
                     "step": 8,
+                    "title": "Confidence Interval",
+                    "detail": f"95% CI: [{round(primary['ci_95'][0], 1)} — {round(primary['ci_95'][1], 1)}]"
+                },
+                {
+                    "step": 9,
                     "title": "Prediction Range",
-                    "detail": f"10th–90th percentile: [{round(likely_range[0], 1)} — {round(likely_range[1], 1)}]"
+                    "detail": f"10th–90th percentile: [{round(primary['likely_range'][0], 1)} — {round(primary['likely_range'][1], 1)}]"
                 }
             ],
             "data_quality": {
@@ -331,3 +359,4 @@ def predict_anchor(date: str, city: str = "Delhi"):
             "description": "Will analyze the current pollution trend shape and match it against historical patterns to refine this prediction."
         }
     }
+

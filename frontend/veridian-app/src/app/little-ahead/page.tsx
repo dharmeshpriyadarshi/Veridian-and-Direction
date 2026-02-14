@@ -12,13 +12,22 @@ import {
 /* =========================================== */
 /*  Type Definitions                           */
 /* =========================================== */
+interface StatBlock {
+    mean: number;
+    median: number;
+    std_dev: number;
+    ci_95: [number, number];
+    likely_range: [number, number];
+    sample_size: number;
+}
+
 interface YearBreakdown {
     year: number;
-    day_aqi: number;
-    day_sample_count: number;
-    year_mean: number;
-    year_median: number;
-    year_std: number;
+    exact_date: string;
+    day_aqi: number | null;
+    day_pm25: number | null;
+    year_aqi_mean: number | null;
+    year_pm25_mean: number;
     year_total_days: number;
     deviation: number;
     deviation_pct: number;
@@ -31,14 +40,19 @@ interface PredictionResult {
         date: string;
         city: string;
         display_date: string;
-        predicted_aqi: number;
-        median_aqi: number;
+        primary_metric: string;
+        predicted_aqi: number | null;
+        median_aqi: number | null;
+        predicted_pm25: number | null;
+        median_pm25: number | null;
         category: string;
         category_color: string;
         severity: string;
         confidence_interval: { lower: number; upper: number };
         likely_range: { lower: number; upper: number };
         std_dev: number;
+        aqi_stats: StatBlock | null;
+        pm25_stats: StatBlock | null;
     };
     yearly_breakdown: YearBreakdown[];
     evaluation: {
@@ -261,10 +275,13 @@ export default function LittleAheadPage() {
                                     <div className="lg:col-span-1 flex flex-col items-center justify-center">
                                         <p className="text-foreground/50 text-sm mb-1">{result.prediction.city}</p>
                                         <p className="text-foreground/40 text-xs mb-3">{result.prediction.display_date}, 2026</p>
-                                        <div className={`text-7xl md:text-8xl font-bold bg-gradient-to-b ${getAqiGradient(result.prediction.predicted_aqi)} bg-clip-text text-transparent`}>
-                                            {result.prediction.predicted_aqi}
+                                        <div className={`text-7xl md:text-8xl font-bold bg-gradient-to-b ${getAqiGradient(result.prediction.predicted_aqi ?? result.prediction.predicted_pm25 ?? 0)} bg-clip-text text-transparent`}>
+                                            {result.prediction.predicted_aqi ?? result.prediction.predicted_pm25}
                                         </div>
-                                        <p className="text-foreground/50 text-sm mt-1">Predicted PM2.5</p>
+                                        <p className="text-foreground/50 text-sm mt-1">Predicted AQI</p>
+                                        {result.prediction.predicted_pm25 != null && (
+                                            <p className="text-foreground/30 text-xs mt-1">PM2.5: {result.prediction.predicted_pm25} µg/m³</p>
+                                        )}
                                         <div
                                             className="mt-4 px-5 py-2 rounded-full text-sm font-bold uppercase tracking-wider"
                                             style={{ backgroundColor: result.prediction.category_color + "22", color: result.prediction.category_color, border: `1px solid ${result.prediction.category_color}44` }}
@@ -275,7 +292,8 @@ export default function LittleAheadPage() {
 
                                     {/* Right: Stats Grid */}
                                     <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        <StatCard icon={<BarChart3 size={16} />} label="Median AQI" value={result.prediction.median_aqi.toString()} />
+                                        <StatCard icon={<BarChart3 size={16} />} label="Median AQI" value={result.prediction.median_aqi?.toString() ?? '—'} />
+                                        <StatCard icon={<Activity size={16} />} label="PM2.5 Mean" value={result.prediction.predicted_pm25 != null ? `${result.prediction.predicted_pm25} µg/m³` : '—'} sublabel={result.prediction.median_pm25 != null ? `Median: ${result.prediction.median_pm25}` : undefined} />
                                         <StatCard icon={<Activity size={16} />} label="Std Deviation" value={`±${result.prediction.std_dev}`} />
                                         <StatCard icon={<Database size={16} />} label="Sample Size" value={`${result.evaluation.data_quality.sample_size} days`} />
                                         <StatCard icon={<ShieldCheck size={16} />} label="95% CI (Mean)" value={`${result.prediction.confidence_interval.lower} — ${result.prediction.confidence_interval.upper}`} />
@@ -286,18 +304,18 @@ export default function LittleAheadPage() {
 
                                 {/* AQI Range Bar */}
                                 <div className="mt-8 pt-6 border-t border-white/5">
-                                    <p className="text-xs text-foreground/40 uppercase tracking-widest mb-3">Prediction Range Visualization</p>
+                                    <p className="text-xs text-foreground/40 uppercase tracking-widest mb-3">AQI Range Visualization</p>
                                     <div className="relative h-3 rounded-full bg-white/5 overflow-hidden">
-                                        <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(to right, #4ade80 0%, #facc15 20%, #f97316 40%, #ef4444 60%, #991b1b 100%)", opacity: 0.15 }} />
+                                        <div className="absolute inset-0 rounded-full" style={{ background: "linear-gradient(to right, #4ade80 0%, #a3e635 10%, #facc15 20%, #f97316 40%, #ef4444 60%, #991b1b 100%)", opacity: 0.15 }} />
                                         <div className="absolute top-0 h-full rounded-full" style={{
                                             left: `${getSeverityWidth(result.prediction.likely_range.lower)}%`,
                                             width: `${getSeverityWidth(result.prediction.likely_range.upper) - getSeverityWidth(result.prediction.likely_range.lower)}%`,
                                             background: `linear-gradient(to right, ${result.prediction.category_color}88, ${result.prediction.category_color})`,
                                         }} />
-                                        <div className="absolute top-[-4px] w-1 h-5 rounded-full bg-white shadow-lg shadow-white/30" style={{ left: `${getSeverityWidth(result.prediction.predicted_aqi)}%` }} />
+                                        <div className="absolute top-[-4px] w-1 h-5 rounded-full bg-white shadow-lg shadow-white/30" style={{ left: `${getSeverityWidth(result.prediction.predicted_aqi ?? result.prediction.predicted_pm25 ?? 0)}%` }} />
                                     </div>
                                     <div className="flex justify-between text-xs text-foreground/30 mt-2">
-                                        <span>0 (Good)</span><span>100</span><span>200</span><span>300</span><span>500 (Hazardous)</span>
+                                        <span>0 (Good)</span><span>50</span><span>100</span><span>200</span><span>300</span><span>500 (Severe)</span>
                                     </div>
                                 </div>
                             </div>
@@ -317,7 +335,7 @@ export default function LittleAheadPage() {
                                         <div className="text-left">
                                             <p className="font-bold">Year-by-Year Historical Data</p>
                                             <p className="text-foreground/40 text-sm">
-                                                See how {result.prediction.display_date} performed in each year vs that year&apos;s average
+                                                Exact readings for {result.prediction.display_date} from the dataset, compared to each year&apos;s average
                                             </p>
                                         </div>
                                     </div>
@@ -335,13 +353,15 @@ export default function LittleAheadPage() {
                                         >
                                             <div className="px-6 pb-6">
                                                 {/* Table Header */}
-                                                <div className="grid grid-cols-12 gap-2 text-xs text-foreground/40 uppercase tracking-wider font-medium pb-3 border-b border-white/5 mb-2">
-                                                    <div className="col-span-1">Year</div>
-                                                    <div className="col-span-2 text-right">Day&apos;s AQI</div>
-                                                    <div className="col-span-2 text-right">Year Mean</div>
-                                                    <div className="col-span-2 text-right">Deviation</div>
-                                                    <div className="col-span-2 text-right">Z-Score</div>
-                                                    <div className="col-span-3">Assessment</div>
+                                                {/* Table Header */}
+                                                <div className="grid grid-cols-14 gap-2 text-xs text-foreground/40 uppercase tracking-wider font-medium pb-3 border-b border-white/5 mb-2" style={{ gridTemplateColumns: '1fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 2fr' }}>
+                                                    <div>Year</div>
+                                                    <div className="text-right">Exact AQI</div>
+                                                    <div className="text-right">Exact PM2.5</div>
+                                                    <div className="text-right">Year AQI Avg</div>
+                                                    <div className="text-right">Deviation</div>
+                                                    <div className="text-right">Z-Score</div>
+                                                    <div>Assessment</div>
                                                 </div>
 
                                                 {/* Table Rows */}
@@ -351,16 +371,20 @@ export default function LittleAheadPage() {
                                                         initial={{ opacity: 0, x: -15 }}
                                                         animate={{ opacity: 1, x: 0 }}
                                                         transition={{ delay: i * 0.05 }}
-                                                        className="grid grid-cols-12 gap-2 py-3 border-b border-white/[0.03] items-center hover:bg-white/[0.02] rounded-lg transition-colors"
+                                                        className="py-3 border-b border-white/[0.03] items-center hover:bg-white/[0.02] rounded-lg transition-colors"
+                                                        style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 2fr', gap: '0.5rem' }}
                                                     >
-                                                        <div className="col-span-1 font-bold text-foreground/70">{yr.year}</div>
-                                                        <div className="col-span-2 text-right font-mono font-bold" style={{ color: getDeviationColor(-yr.z_score + 1) }}>
-                                                            {yr.day_aqi}
+                                                        <div className="font-bold text-foreground/70">{yr.year}</div>
+                                                        <div className="text-right font-mono font-bold" style={{ color: getDeviationColor(-yr.z_score + 1) }}>
+                                                            {yr.day_aqi ?? '—'}
                                                         </div>
-                                                        <div className="col-span-2 text-right text-foreground/50 font-mono">
-                                                            {yr.year_mean}
+                                                        <div className="text-right font-mono text-foreground/40">
+                                                            {yr.day_pm25 ?? '—'}
                                                         </div>
-                                                        <div className="col-span-2 text-right flex items-center justify-end gap-1">
+                                                        <div className="text-right text-foreground/50 font-mono">
+                                                            {yr.year_aqi_mean ?? '—'}
+                                                        </div>
+                                                        <div className="text-right flex items-center justify-end gap-1">
                                                             {yr.deviation > 5 ? (
                                                                 <ArrowUpRight size={14} className="text-red-400" />
                                                             ) : yr.deviation < -5 ? (
@@ -373,10 +397,10 @@ export default function LittleAheadPage() {
                                                             </span>
                                                             <span className="text-foreground/25 text-xs">({yr.deviation_pct > 0 ? '+' : ''}{yr.deviation_pct}%)</span>
                                                         </div>
-                                                        <div className="col-span-2 text-right font-mono text-sm" style={{ color: getDeviationColor(yr.z_score) }}>
+                                                        <div className="text-right font-mono text-sm" style={{ color: getDeviationColor(yr.z_score) }}>
                                                             {yr.z_score > 0 ? '+' : ''}{yr.z_score}σ
                                                         </div>
-                                                        <div className="col-span-3">
+                                                        <div>
                                                             <span className="text-xs px-2 py-1 rounded-md font-medium"
                                                                 style={{
                                                                     backgroundColor: getDeviationColor(yr.z_score) + "18",
