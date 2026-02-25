@@ -743,17 +743,25 @@ function HistoricalDriftTable() {
                                 let shiftLabel = "—";
 
                                 if (prevSpike) {
-                                    // Calculate rough day shift (simplification for visualization)
+                                    // Calculate exact day shift (handling bleed into Dec/Feb correctly)
                                     const d1 = new Date(spike.centroid_date);
                                     const d2 = new Date(prevSpike.centroid_date);
-                                    // Adjust for year difference so we just compare day within year
-                                    d1.setFullYear(2000);
-                                    d2.setFullYear(2000);
+
+                                    // Project the previous spike's logical year to the current spike's logical year
+                                    // so we can see the literal drift in days regardless of if it fell in Dec or Jan
+                                    d2.setFullYear(d2.getFullYear() + (spike.year - prevSpike.year));
+
                                     shiftDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
 
-                                    if (shiftDays > 0) shiftLabel = `+${shiftDays} days (Forward)`;
-                                    else if (shiftDays < 0) shiftLabel = `${shiftDays} days (Backward)`;
-                                    else shiftLabel = "Static";
+                                    if (Math.abs(shiftDays) > 45) {
+                                        shiftLabel = `Pattern Broken (${shiftDays > 0 ? '+' : ''}${shiftDays}d)`;
+                                    } else if (shiftDays > 0) {
+                                        shiftLabel = `+${shiftDays} days (Forward)`;
+                                    } else if (shiftDays < 0) {
+                                        shiftLabel = `${shiftDays} days (Backward)`;
+                                    } else {
+                                        shiftLabel = "Static";
+                                    }
                                 }
 
                                 return (
