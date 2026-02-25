@@ -252,6 +252,11 @@ export default function LittleAheadPage() {
                 </motion.div>
 
                 {/* ============================================ */}
+                {/*  HISTORICAL DRIFT TABLE (Module 1)           */}
+                {/* ============================================ */}
+                <HistoricalDriftTable />
+
+                {/* ============================================ */}
                 {/*  PREDICTION RESULT                           */}
                 {/* ============================================ */}
                 <AnimatePresence mode="wait">
@@ -595,6 +600,159 @@ function StatCard({ icon, label, value, sublabel }: { icon: React.ReactNode; lab
             </div>
             <p className="text-xl font-bold">{value}</p>
             {sublabel && <p className="text-xs text-foreground/30 mt-1">{sublabel}</p>}
+        </div>
+    );
+}
+
+/* =========================================== */
+/*  Historical Drift Table                     */
+/* =========================================== */
+interface HistoricalSpike {
+    month: number;
+    year: number;
+    centroid_date: string;
+    peak_aqi_average: number;
+}
+
+function HistoricalDriftTable() {
+    const [spikes, setSpikes] = useState<HistoricalSpike[]>([]);
+    const [selectedMonth, setSelectedMonth] = useState<number>(1);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        fetch("http://127.0.0.1:8000/tsmart/historical_spikes")
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setSpikes(data);
+                }
+            })
+            .catch(err => console.error("Could not load historical spikes:", err))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const months = [
+        { value: 1, label: "January" }, { value: 2, label: "February" },
+        { value: 3, label: "March" }, { value: 4, label: "April" },
+        { value: 5, label: "May" }, { value: 6, label: "June" },
+        { value: 7, label: "July" }, { value: 8, label: "August" },
+        { value: 9, label: "September" }, { value: 10, label: "October" },
+        { value: 11, label: "November" }, { value: 12, label: "December" }
+    ];
+
+    const filteredSpikes = spikes.filter(s => s.month === selectedMonth).sort((a, b) => a.year - b.year);
+
+    return (
+        <div className="glass-panel rounded-3xl p-8 mb-8 border border-[var(--veridian-accent)]/20">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                <div>
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--veridian-accent)]/20 flex items-center justify-center">
+                            <TrendingUp size={20} className="text-[var(--veridian-accent)]" />
+                        </div>
+                        <h2 className="text-2xl font-bold">T-SMART: Historical Spike Drift Tracker</h2>
+                    </div>
+                    <p className="text-foreground/50 text-sm max-w-2xl pl-13">
+                        <span className="text-[var(--veridian-accent)] font-medium">Module 1 (Deep Observation):</span> Tracking the &quot;Highest 7-Day AQI Window&quot; for each month over the last 10 years to observe its temporal drift.
+                    </p>
+                </div>
+
+                <div className="relative w-full md:w-48 self-start md:self-auto">
+                    <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-foreground font-medium
+                                   focus:outline-none focus:border-[var(--veridian-accent)] focus:ring-1 focus:ring-[var(--veridian-accent)]/30
+                                   appearance-none cursor-pointer"
+                        style={{ colorScheme: "dark" }}
+                    >
+                        {months.map(m => (
+                            <option key={m.value} value={m.value} className="bg-[#1a2012]">{m.label}</option>
+                        ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
+                        <ChevronDown size={16} />
+                    </div>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-[var(--veridian-accent)]/30 border-t-[var(--veridian-accent)] rounded-full animate-spin" />
+                </div>
+            ) : filteredSpikes.length === 0 ? (
+                <div className="text-center py-12 text-foreground/40 bg-white/5 rounded-2xl">
+                    No historical spike data found. Ensure the dataset is processed.
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-white/10 text-foreground/40 text-xs uppercase tracking-wider">
+                                <th className="pb-4 font-medium pl-4">Year</th>
+                                <th className="pb-4 font-medium">Peak Shift (Centroid Date)</th>
+                                <th className="pb-4 font-medium text-right pr-4">7-Day Max AQI Average</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredSpikes.map((spike, idx) => {
+                                const prevSpike = idx > 0 ? filteredSpikes[idx - 1] : null;
+                                let shiftDays = 0;
+                                let shiftLabel = "—";
+
+                                if (prevSpike) {
+                                    // Calculate rough day shift (simplification for visualization)
+                                    const d1 = new Date(spike.centroid_date);
+                                    const d2 = new Date(prevSpike.centroid_date);
+                                    // Adjust for year difference so we just compare day within year
+                                    d1.setFullYear(2000);
+                                    d2.setFullYear(2000);
+                                    shiftDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    if (shiftDays > 0) shiftLabel = `+${shiftDays} days (Forward)`;
+                                    else if (shiftDays < 0) shiftLabel = `${shiftDays} days (Backward)`;
+                                    else shiftLabel = "Static";
+                                }
+
+                                return (
+                                    <tr key={spike.year} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+                                        <td className="py-4 pl-4 font-bold text-lg">{spike.year}</td>
+                                        <td className="py-4">
+                                            <div className="flex items-center gap-4">
+                                                <span className="font-mono text-[var(--veridian-primary)] bg-[var(--veridian-primary)]/10 px-3 py-1 rounded-md">
+                                                    {spike.centroid_date}
+                                                </span>
+                                                <span className={`text-xs font-mono 
+                                                    ${shiftDays > 0 ? 'text-orange-400' : shiftDays < 0 ? 'text-blue-400' : 'text-foreground/30'}
+                                                    opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                                    {shiftLabel}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="py-4 pr-4 text-right">
+                                            <div className="flex justify-end items-center gap-3">
+                                                <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full"
+                                                        style={{
+                                                            width: `${Math.min((spike.peak_aqi_average / 500) * 100, 100)}%`,
+                                                            backgroundColor: spike.peak_aqi_average > 300 ? '#ef4444' : spike.peak_aqi_average > 200 ? '#facc15' : '#4ade80'
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="font-mono font-bold w-12 text-right">
+                                                    {spike.peak_aqi_average.toFixed(1)}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }

@@ -360,3 +360,24 @@ def predict_anchor(date: str, city: str = "Delhi"):
         }
     }
 
+
+# =====================================================
+# T-SMART Module 1: Historical Spikes
+# =====================================================
+@app.get("/tsmart/historical_spikes")
+def get_historical_spikes():
+    """
+    Returns the pre-calculated historical 7-day AQI peak drift array.
+    Used for Module 1 visualization (The Historical Drift Table).
+    """
+    import json
+    historical_data_path = os.path.join(ROOT_DIR, 'data', 'tsmart_module1_historical.json')
+    try:
+        with open(historical_data_path, "r") as f:
+            data = json.load(f)
+        return data
+    except FileNotFoundError:
+        # If the file hasn't been generated yet, just return an empty array
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
