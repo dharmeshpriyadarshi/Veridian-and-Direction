@@ -133,7 +133,7 @@ export default function InsightsPage() {
                                 ].map((item, i) => (
                                     <div key={i} className="bg-foreground/5 p-4 rounded-xl">
                                         <p className="text-xs text-foreground/50 uppercase tracking-wider mb-1">{item.label}</p>
-                                        <p className="text-xl font-semibold">{item.value} <span className="text-sm font-normal text-foreground/40">{item.unit}</span></p>
+                                        <p className="text-xl font-semibold">{item.value ? Number(item.value.toFixed(3)) : 0} <span className="text-sm font-normal text-foreground/40">{item.unit}</span></p>
                                     </div>
                                 ))}
                             </div>
@@ -150,18 +150,18 @@ export default function InsightsPage() {
                                 <div>
                                     <h3 className="text-lg text-foreground/60 mb-1">Current Weather</h3>
                                     <div className="text-4xl font-bold flex items-center gap-4">
-                                        {data.temp}°C
+                                        {data.temp ? Number(data.temp.toFixed(3)) : 0}°C
                                         <span className="text-base font-normal px-3 py-1 bg-foreground/10 rounded-full">{data.condition}</span>
                                     </div>
                                 </div>
                                 <div className="flex gap-6 text-foreground/60">
                                     <div className="text-center">
                                         <Droplets className="mx-auto mb-1 text-veridian-primary" />
-                                        <span className="text-sm">{data.humidity}%</span>
+                                        <span className="text-sm">{data.humidity ? Number(data.humidity.toFixed(3)) : 0}%</span>
                                     </div>
                                     <div className="text-center">
                                         <Wind className="mx-auto mb-1 text-veridian-primary" />
-                                        <span className="text-sm">{data.windSpeed} km/h</span>
+                                        <span className="text-sm">{data.windSpeed ? Number(data.windSpeed.toFixed(3)) : 0} km/h</span>
                                     </div>
                                 </div>
                             </motion.div>
