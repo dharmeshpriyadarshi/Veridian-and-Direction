@@ -617,20 +617,38 @@ interface HistoricalSpike {
 function HistoricalDriftTable() {
     const [spikes, setSpikes] = useState<HistoricalSpike[]>([]);
     const [selectedMonth, setSelectedMonth] = useState<number>(1);
+    const [selectedCity, setSelectedCity] = useState<string>("Delhi");
+    const [cities, setCities] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Load available cities
+    useEffect(() => {
+        fetch("http://127.0.0.1:8000/cities")
+            .then(res => res.json())
+            .then(data => {
+                if (data.cities) setCities(data.cities);
+            })
+            .catch(() => setCities(["Delhi"])); // fallback
+    }, []);
+
+    // Load spikes when city changes
     useEffect(() => {
         setLoading(true);
-        fetch("http://127.0.0.1:8000/tsmart/historical_spikes")
+        fetch(`http://127.0.0.1:8000/tsmart/historical_spikes?city=${encodeURIComponent(selectedCity)}`)
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
                     setSpikes(data);
+                } else {
+                    setSpikes([]);
                 }
             })
-            .catch(err => console.error("Could not load historical spikes:", err))
+            .catch(err => {
+                console.error("Could not load historical spikes:", err);
+                setSpikes([]);
+            })
             .finally(() => setLoading(false));
-    }, []);
+    }, [selectedCity]);
 
     const months = [
         { value: 1, label: "January" }, { value: 2, label: "February" },
@@ -645,34 +663,56 @@ function HistoricalDriftTable() {
 
     return (
         <div className="glass-panel rounded-3xl p-8 mb-8 border border-[var(--veridian-accent)]/20">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                <div>
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+                <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="w-10 h-10 rounded-xl bg-[var(--veridian-accent)]/20 flex items-center justify-center">
                             <TrendingUp size={20} className="text-[var(--veridian-accent)]" />
                         </div>
                         <h2 className="text-2xl font-bold">T-SMART: Historical Spike Drift Tracker</h2>
                     </div>
-                    <p className="text-foreground/50 text-sm max-w-2xl pl-13">
+                    <p className="text-foreground/50 text-sm pl-13">
                         <span className="text-[var(--veridian-accent)] font-medium">Module 1 (Deep Observation):</span> Tracking the &quot;Highest 7-Day AQI Window&quot; for each month over the last 10 years to observe its temporal drift.
                     </p>
                 </div>
 
-                <div className="relative w-full md:w-48 self-start md:self-auto">
-                    <select
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-foreground font-medium
-                                   focus:outline-none focus:border-[var(--veridian-accent)] focus:ring-1 focus:ring-[var(--veridian-accent)]/30
-                                   appearance-none cursor-pointer"
-                        style={{ colorScheme: "dark" }}
-                    >
-                        {months.map(m => (
-                            <option key={m.value} value={m.value} className="bg-[#1a2012]">{m.label}</option>
-                        ))}
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
-                        <ChevronDown size={16} />
+                <div className="flex flex-col sm:flex-row gap-4">
+                    {/* City Dropdown */}
+                    <div className="relative w-full sm:w-48">
+                        <select
+                            value={selectedCity}
+                            onChange={(e) => setSelectedCity(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-foreground font-medium
+                                       focus:outline-none focus:border-[var(--veridian-accent)] focus:ring-1 focus:ring-[var(--veridian-accent)]/30
+                                       appearance-none cursor-pointer"
+                            style={{ colorScheme: "dark" }}
+                        >
+                            {cities.map(c => (
+                                <option key={c} value={c} className="bg-[#1a2012]">{c}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
+                            <ChevronDown size={16} />
+                        </div>
+                    </div>
+
+                    {/* Month Dropdown */}
+                    <div className="relative w-full sm:w-48">
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-foreground font-medium
+                                       focus:outline-none focus:border-[var(--veridian-accent)] focus:ring-1 focus:ring-[var(--veridian-accent)]/30
+                                       appearance-none cursor-pointer"
+                            style={{ colorScheme: "dark" }}
+                        >
+                            {months.map(m => (
+                                <option key={m.value} value={m.value} className="bg-[#1a2012]">{m.label}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
+                            <ChevronDown size={16} />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -683,7 +723,8 @@ function HistoricalDriftTable() {
                 </div>
             ) : filteredSpikes.length === 0 ? (
                 <div className="text-center py-12 text-foreground/40 bg-white/5 rounded-2xl">
-                    No historical spike data found. Ensure the dataset is processed.
+                    No historical spike data found for {selectedCity} in {months.find(m => m.value === selectedMonth)?.label}.
+                    Ensure the dataset is processed.
                 </div>
             ) : (
                 <div className="overflow-x-auto">
