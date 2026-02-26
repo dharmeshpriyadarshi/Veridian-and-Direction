@@ -252,10 +252,6 @@ export default function LittleAheadPage() {
                     </AnimatePresence>
                 </motion.div>
 
-                {/* ============================================ */}
-                {/*  HISTORICAL DRIFT TABLE (Module 1)           */}
-                {/* ============================================ */}
-                <HistoricalDriftTable />
 
                 {/* ============================================ */}
                 {/*  PREDICTION RESULT                           */}
@@ -507,6 +503,11 @@ export default function LittleAheadPage() {
                                     )}
                                 </AnimatePresence>
                             </div>
+
+                            {/* ============================================ */}
+                            {/*  HISTORICAL DRIFT TABLE (Module 1)           */}
+                            {/* ============================================ */}
+                            <HistoricalDriftTable />
 
                             {/* ============================================ */}
                             {/*  METHOD 2: TRAJECTORY VECTOR                 */}
