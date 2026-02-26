@@ -14,6 +14,7 @@ warnings.filterwarnings('ignore')
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Go up from backend/ to root
 sys.path.insert(0, os.path.join(ROOT_DIR, 'ml_engine'))
 from main import load_data, preprocess_data, calculate_probabilistic_stats
+from tsmart_module2 import extract_trajectory_vector
 
 app = FastAPI()
 
@@ -381,5 +382,43 @@ def get_historical_spikes(city: str = "Delhi"):
     except FileNotFoundError:
         # If the file hasn't been generated yet, just return an empty array
         return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# T-SMART Module 2: Trajectory Vector
+# =====================================================
+@app.get("/tsmart/trajectory_vector")
+def get_trajectory_vector(city: str = "Delhi", target_date: str = "2024-01-14"):
+    """
+    Returns the DTW matched trajectory vector for a given city and target date.
+    Analyses the preceding 14 days and matches against historical data.
+    """
+    # Use cached city data if available
+    city_df = get_city_data(city)
+    if city_df is None or city_df.empty:
+        raise HTTPException(status_code=404, detail=f"No data found for city '{city}'")
+        
+    try:
+        # The extract_trajectory_vector function expects the full dataframe in its signature,
+        # but since we already filtered it for the city, we can just pass city_df.
+        # Let's adjust slightly: pass city_df directly, and tell the function it's already filtered,
+        # OR we can just pass the original dataframe structure.
+        # Wait, the function in tsmart_module2 does: city_df = df[df['City'] == city].copy()
+        # It expects the full df! But it also works if city_df is passed as long as city column exists.
+        result = extract_trajectory_vector(city_df, city=city, target_date=target_date)
+        
+        if "error" in result:
+             raise HTTPException(status_code=400, detail=result["error"])
+             
+        # Format the result to match the expected API structure
+        # Add the evaluation metadata
+        result["evaluation"] = {
+            "method": "Adaptive Brain (DTW Trend Matching)",
+            "description": f"Analyzed 14-day AQI trend leading up to {target_date} in {city} and found the top {len(result['historical_matches'])} matching historical patterns.",
+            "drift_velocity": result["drift_velocity"]
+        }
+        
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

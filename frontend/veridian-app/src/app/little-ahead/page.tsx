@@ -6,8 +6,9 @@ import { useState, useEffect } from "react";
 import {
     Search, Calendar, TrendingUp, ShieldCheck, AlertCircle,
     ChevronDown, ChevronUp, Database, Cpu, Lock, BarChart3,
-    Activity, Layers, ArrowRight, MapPin, ArrowUpRight, ArrowDownRight, Minus
+    Activity, Layers, ArrowRight, MapPin, ArrowUpRight, ArrowDownRight, Minus, GitMerge
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart } from "recharts";
 
 /* =========================================== */
 /*  Type Definitions                           */
@@ -508,57 +509,9 @@ export default function LittleAheadPage() {
                             </div>
 
                             {/* ============================================ */}
-                            {/*  METHOD 2: COMING SOON PLACEHOLDER           */}
+                            {/*  METHOD 2: TRAJECTORY VECTOR                 */}
                             {/* ============================================ */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.3 }}
-                                className="glass-panel rounded-3xl p-8 border border-dashed border-[var(--veridian-accent)]/30 relative overflow-hidden"
-                            >
-                                <div className="absolute inset-0 opacity-5">
-                                    <div className="absolute inset-0" style={{
-                                        backgroundImage: `repeating-linear-gradient(90deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px),
-                                            repeating-linear-gradient(0deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px)`
-                                    }} />
-                                </div>
-
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-xl bg-[var(--veridian-accent)]/20 flex items-center justify-center">
-                                            <Activity size={20} className="text-[var(--veridian-accent)]" />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-3">
-                                                <h3 className="text-xl font-bold">{result.method2_status.name}</h3>
-                                                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
-                                                               bg-[var(--veridian-accent)]/15 text-[var(--veridian-accent)] border border-[var(--veridian-accent)]/20">
-                                                    Coming Soon
-                                                </span>
-                                            </div>
-                                            <p className="text-foreground/40 text-sm mt-1">Method 2 — The Adaptive Brain</p>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-foreground/50 text-sm leading-relaxed max-w-2xl mb-6">
-                                        {result.method2_status.description} This will use <span className="text-[var(--veridian-primary)] font-medium">Dynamic Time Warping (DTW)</span> to
-                                        identify if the current pollution pattern matches a known seasonal trend (e.g., &ldquo;Winter Smog&rdquo;, &ldquo;Crop Burning Season&rdquo;),
-                                        and will adjust the Historical Anchor prediction accordingly.
-                                    </p>
-
-                                    <div className="flex flex-wrap gap-3">
-                                        <div className="px-4 py-2 rounded-lg bg-white/5 text-xs text-foreground/30 flex items-center gap-2">
-                                            <ArrowRight size={12} /> Trend Shape Analysis
-                                        </div>
-                                        <div className="px-4 py-2 rounded-lg bg-white/5 text-xs text-foreground/30 flex items-center gap-2">
-                                            <ArrowRight size={12} /> Subsequence Matching
-                                        </div>
-                                        <div className="px-4 py-2 rounded-lg bg-white/5 text-xs text-foreground/30 flex items-center gap-2">
-                                            <ArrowRight size={12} /> Prediction Refinement
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
+                            <TrajectoryVector city={selectedCity} targetDate={selectedDate} />
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -803,5 +756,200 @@ function HistoricalDriftTable() {
                 </div>
             )}
         </div>
+    );
+}
+
+/* =========================================== */
+/*  Trajectory Vector (Module 2)               */
+/* =========================================== */
+function TrajectoryVector({ city, targetDate }: { city: string; targetDate: string }) {
+    const [data, setData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!city || !targetDate) return;
+        setLoading(true);
+        setError("");
+        fetch(`http://127.0.0.1:8000/tsmart/trajectory_vector?city=${encodeURIComponent(city)}&target_date=${encodeURIComponent(targetDate)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Could not fetch trajectory vector.");
+                return res.json();
+            })
+            .then(resData => {
+                if (resData.detail) throw new Error(resData.detail);
+                setData(resData);
+            })
+            .catch(err => setError(err.message))
+            .finally(() => setLoading(false));
+    }, [city, targetDate]);
+
+    if (loading) {
+        return (
+            <div className="glass-panel p-8 rounded-3xl border border-[var(--veridian-accent)]/20 mt-8 flex justify-center py-12 relative overflow-hidden">
+                <div className="absolute inset-0 opacity-5">
+                    <div className="absolute inset-0" style={{
+                        backgroundImage: `repeating-linear-gradient(90deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px),
+                            repeating-linear-gradient(0deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px)`
+                    }} />
+                </div>
+                <div className="w-8 h-8 border-2 border-[var(--veridian-accent)]/30 border-t-[var(--veridian-accent)] rounded-full animate-spin relative z-10" />
+            </div>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <div className="glass-panel p-8 rounded-3xl border border-red-500/20 mt-8 flex items-center gap-3 text-red-400">
+                <AlertCircle size={20} />
+                <p>Trajectory Vector Unavailable: {error || "No data"}</p>
+            </div>
+        );
+    }
+
+    // Prepare chart data combining baseline and predicted
+    const chartData = [];
+    const baselineLen = data.baseline_aqi.length;
+
+    // Add baseline
+    for (let i = 0; i < baselineLen; i++) {
+        chartData.push({
+            day: `Day -${baselineLen - i}`,
+            actual: data.baseline_aqi[i],
+            predicted: null,
+            isForecast: false
+        });
+    }
+
+    // Connect actual to predicted
+    if (baselineLen > 0) {
+        const lastActual = data.baseline_aqi[baselineLen - 1];
+
+        // Add predicted
+        for (let i = 0; i < data.predicted_aqi.length; i++) {
+            chartData.push({
+                day: `Day +${i + 1}`,
+                actual: i === 0 ? lastActual : null, // Connect the lines
+                predicted: data.predicted_aqi[i],
+                isForecast: true
+            });
+        }
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-panel rounded-3xl p-8 border border-[var(--veridian-accent)]/30 relative overflow-hidden mt-8"
+        >
+            <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: `repeating-linear-gradient(90deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px),
+                        repeating-linear-gradient(0deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px)`
+                }} />
+            </div>
+
+            <div className="relative z-10">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-[var(--veridian-accent)]/20 flex items-center justify-center">
+                                <GitMerge size={20} className="text-[var(--veridian-accent)]" />
+                            </div>
+                            <h3 className="text-xl font-bold">T-SMART: Trajectory Vector</h3>
+                        </div>
+                        <p className="text-foreground/50 text-sm max-w-2xl pl-13">
+                            <span className="text-[var(--veridian-accent)] font-medium">Module 2 (Adaptive Brain):</span> Uses Dynamic Time Warping (DTW)
+                            to match the exact shape of the last 14 days against 10 years of history, deriving the most statistically probable momentum drift.
+                        </p>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-end min-w-[160px]">
+                        <p className="text-xs text-foreground/40 uppercase tracking-wider mb-1">Drift Velocity (Δd)</p>
+                        <div className="flex items-center gap-2">
+                            {data.drift_velocity > 0 ? (
+                                <ArrowUpRight className="text-red-400" size={20} />
+                            ) : data.drift_velocity < 0 ? (
+                                <ArrowDownRight className="text-blue-400" size={20} />
+                            ) : (
+                                <Minus className="text-foreground/40" size={20} />
+                            )}
+                            <span className={`text-2xl font-bold ${data.drift_velocity > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                                {data.drift_velocity > 0 ? '+' : ''}{data.drift_velocity}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Trajectory Chart */}
+                <div className="h-[250px] w-full mt-8 mb-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis
+                                dataKey="day"
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                minTickGap={20}
+                            />
+                            <YAxis
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#1a2012', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                itemStyle={{ color: '#fff' }}
+                            />
+                            <ReferenceLine x="Day +1" stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+                            <Line
+                                type="monotone"
+                                dataKey="actual"
+                                stroke="var(--veridian-primary)"
+                                strokeWidth={3}
+                                dot={false}
+                                name="14-Day Baseline"
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="predicted"
+                                stroke="var(--veridian-accent)"
+                                strokeWidth={3}
+                                strokeDasharray="5 5"
+                                dot={{ r: 4, fill: "var(--veridian-accent)", strokeWidth: 0 }}
+                                name="Predicted Trajectory"
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Top Historical Matches */}
+                <div>
+                    <p className="text-sm font-bold mb-4 flex items-center gap-2">
+                        <Database size={14} className="text-[var(--veridian-primary)]" />
+                        Top Historical DTW Matches
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {data.historical_matches?.map((match: any, idx: number) => (
+                            <div key={idx} className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col justify-between">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs text-foreground/40 font-mono">Rank #{idx + 1}</span>
+                                    <span className="text-[10px] uppercase font-bold text-[var(--veridian-primary)] bg-[var(--veridian-primary)]/10 px-2 py-0.5 rounded-full">
+                                        Dist: {match.distance}
+                                    </span>
+                                </div>
+                                <p className="font-bold text-sm">
+                                    {new Date(match.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <span className="text-foreground/30 mx-2">to</span>
+                                    {new Date(match.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </motion.div>
     );
 }
