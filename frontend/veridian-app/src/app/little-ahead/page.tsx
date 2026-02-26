@@ -90,6 +90,7 @@ export default function LittleAheadPage() {
     const [selectedCity, setSelectedCity] = useState("Delhi");
     const [cities, setCities] = useState<string[]>([]);
     const [result, setResult] = useState<PredictionResult | null>(null);
+    const [trajectoryData, setTrajectoryData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [showEvaluation, setShowEvaluation] = useState(false);
@@ -114,6 +115,7 @@ export default function LittleAheadPage() {
         setLoading(true);
         setError("");
         setResult(null);
+        setTrajectoryData(null);
         setShowEvaluation(false);
         setShowYearlyBreakdown(false);
 
@@ -527,12 +529,17 @@ export default function LittleAheadPage() {
                             {/* ============================================ */}
                             {/*  METHOD 2: TRAJECTORY VECTOR                 */}
                             {/* ============================================ */}
-                            <TrajectoryVector city={selectedCity} targetDate={selectedDate} />
+                            <TrajectoryVector city={selectedCity} targetDate={selectedDate} onDataLoaded={setTrajectoryData} />
 
                             {/* ============================================ */}
                             {/*  MODULE 3: SURGE OVERLAY                     */}
                             {/* ============================================ */}
                             <Module3SurgeOverlay result={result} />
+
+                            {/* ============================================ */}
+                            {/*  MODULE 4: INSIGHT ENGINE                    */}
+                            {/* ============================================ */}
+                            {trajectoryData && <ResearchInsightCard result={result} trajectory={trajectoryData} />}
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -789,7 +796,7 @@ function HistoricalDriftTable({ defaultCity = "Delhi", defaultMonth = 1 }: { def
 /* =========================================== */
 /*  Trajectory Vector (Module 2)               */
 /* =========================================== */
-function TrajectoryVector({ city, targetDate }: { city: string; targetDate: string }) {
+function TrajectoryVector({ city, targetDate, onDataLoaded }: { city: string; targetDate: string; onDataLoaded?: (data: any) => void }) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -806,6 +813,7 @@ function TrajectoryVector({ city, targetDate }: { city: string; targetDate: stri
             .then(resData => {
                 if (resData.detail) throw new Error(resData.detail);
                 setData(resData);
+                if (onDataLoaded) onDataLoaded(resData);
             })
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
@@ -1046,6 +1054,92 @@ function Module3SurgeOverlay({ result }: { result: PredictionResult }) {
                             <Area type="monotone" dataKey="surge_magnitude" stackId="1" stroke="#ef4444" fill="url(#surgeGradient)" name="Surge Overlay" />
                         </AreaChart>
                     </ResponsiveContainer>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* =========================================== */
+/*  Module 4: The Insight Engine               */
+/* =========================================== */
+function ResearchInsightCard({ result, trajectory }: { result: PredictionResult, trajectory: any }) {
+    const [insight, setInsight] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!result || !trajectory) return;
+        setLoading(true);
+        fetch("http://127.0.0.1:8000/tsmart/insights", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                drift_velocity: trajectory.drift_velocity,
+                intensity_index: result.intensity_index.value,
+                historical_mean: result.prediction.aqi_stats?.mean || 0,
+                centroid_dates: trajectory.historical_matches.map((m: any) => m.end_date),
+                target_date: result.prediction.date,
+                city: result.prediction.city
+            })
+        })
+            .then(res => res.json())
+            .then(data => setInsight(data))
+            .catch(err => console.error("Failed to generate insights", err))
+            .finally(() => setLoading(false));
+    }, [result, trajectory]);
+
+    if (!insight) return null;
+
+    return (
+        <div className="glass-panel p-8 rounded-3xl border border-blue-500/30 mt-8 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-5" style={{ backgroundColor: "#3b82f6" }} />
+
+            <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                        <Layers size={20} className="text-blue-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-bold flex items-center gap-3">
+                            Insight Engine
+                            <span className="text-sm font-normal py-1 px-3 bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">
+                                {insight.trajectory_name}
+                            </span>
+                        </h3>
+                    </div>
+                </div>
+
+                <p className="text-foreground/80 text-lg leading-relaxed mb-6 font-medium pl-13">
+                    {insight.drift_summary}
+                </p>
+
+                <div className="flex flex-col md:flex-row gap-6 mt-8">
+                    <div className="flex-1 bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col items-center justify-center">
+                        <div className="text-sm text-foreground/50 uppercase tracking-widest font-bold mb-2">Engine Confidence</div>
+                        <div className="text-5xl font-black text-blue-400">{insight.confidence_score}</div>
+                    </div>
+
+                    <div className="flex-[2] bg-white/5 p-6 rounded-2xl border border-white/10 overflow-x-auto">
+                        <div className="text-sm text-foreground/50 uppercase tracking-widest font-bold mb-4">Historical Reference Table</div>
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="text-foreground/40 text-xs uppercase border-b border-white/10">
+                                    <th className="pb-3 pl-2">Pattern Match</th>
+                                    <th className="pb-3">DTW Distance</th>
+                                    <th className="pb-3 text-right pr-2">Historical Drift</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {trajectory.historical_matches.slice(0, 3).map((match: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                                        <td className="py-3 pl-2 font-mono text-sm">{match.start_date} <span className="text-foreground/30 px-1">to</span> {match.end_date}</td>
+                                        <td className="py-3 font-mono text-blue-400">{match.distance.toFixed(2)}</td>
+                                        <td className="py-3 text-right pr-2">{trajectory.drift_velocity > 0 ? "+" : ""}{trajectory.drift_velocity.toFixed(1)}d</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

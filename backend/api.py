@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -468,5 +469,76 @@ def get_trajectory_vector(city: str = "Delhi", target_date: str = "2024-01-14"):
         }
         
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# T-SMART Module 4: The Insight Engine ("Deep Observation")
+# =====================================================
+class InsightRequest(BaseModel):
+    drift_velocity: float
+    intensity_index: float
+    historical_mean: float
+    centroid_dates: list[str] = []
+    target_date: str
+    city: str
+
+def generate_research_narrative(req: InsightRequest) -> dict:
+    """
+    Synthesizes the Trajectory (Module 2) and Intensity (Module 3) data into a human-readable research narrative.
+    """
+    try:
+        target_month = int(req.target_date.split("-")[1])
+    except:
+        target_month = 1
+
+    trajectory_name = ""
+    drift_summary = ""
+    
+    # Calculate difference between expected and current intensity
+    intensity_diff = req.intensity_index - req.historical_mean
+    is_high_intensity = intensity_diff > (req.historical_mean * 0.1)  # 10% higher than average
+    
+    # Analyze drift (negative = backwards/early shift, positive = forwards/delayed shift)
+    if req.drift_velocity < -5:
+        if is_high_intensity:
+            trajectory_name = "Accelerated Accumulation"
+            drift_summary = f"The {req.city} pollution peak is shifting forward (arriving roughly {abs(int(req.drift_velocity))} days earlier than historical norms). Combined with a dangerously high intensity value of {req.intensity_index:.1f}, this indicates a severe and prematurely forming smog wave."
+        else:
+            trajectory_name = "Early Dispersion"
+            drift_summary = f"The historical peak is arriving earlier (by ~{abs(int(req.drift_velocity))} days), but with below-average severity, indicating early wind dispersion and atmospheric instability."
+    elif req.drift_velocity > 5:
+        if is_high_intensity:
+            trajectory_name = "Delayed Spike Synthesis"
+            drift_summary = f"The pollution peak is delayed by ~{abs(int(req.drift_velocity))} days compared to historical baselines. However, the intensity remains exceptionally high ({req.intensity_index:.1f}), indicating a massive airborne accumulation period currently deferred by meteorology."
+        else:
+            trajectory_name = "Stagnant Deferred Pattern"
+            drift_summary = f"The expected smog peak is delayed by ~{abs(int(req.drift_velocity))} days, but the overall calculated severity remains relatively low and stable."
+    else:
+        if is_high_intensity:
+            trajectory_name = "Intense Baseline Spike"
+            drift_summary = f"The pollution pattern aligns closely with historical centroid dates (minimal drift), but the magnitude ({req.intensity_index:.1f}) is significantly higher than the 10-year historical average."
+        else:
+            trajectory_name = "Stable Historic Pattern"
+            drift_summary = f"The atmospheric accumulation in {req.city} is highly stable, arriving perfectly on schedule with predictable historical severity."
+
+    # Base confidence score on the magnitude of the drift. 
+    # High drift = lower confidence in exact matching, but highly valuable insight.
+    # If drift is minor, pattern is very confident.
+    confidence = min(96, max(68, 100 - (abs(int(req.drift_velocity)) // 2)))
+    
+    return {
+        "trajectory_name": trajectory_name,
+        "drift_summary": drift_summary,
+        "confidence_score": f"{confidence}%"
+    }
+
+@app.post("/tsmart/insights")
+def get_tsmart_insights(req: InsightRequest):
+    """
+    Dynamic endpoint to synthesize Module 1-3 metrics into a textual Insight Engine output.
+    """
+    try:
+        return generate_research_narrative(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
