@@ -55,6 +55,18 @@ interface PredictionResult {
         aqi_stats: StatBlock | null;
         pm25_stats: StatBlock | null;
     };
+    intensity_index: {
+        value: number;
+        surge_max: number;
+    };
+    forecast_7_day: {
+        date: string;
+        day_offset: number;
+        baseline: number;
+        surge_magnitude: number;
+        is_surge: boolean;
+        predicted_aqi: number;
+    }[];
     yearly_breakdown: YearBreakdown[];
     evaluation: {
         method: string;
@@ -513,6 +525,11 @@ export default function LittleAheadPage() {
                             {/*  METHOD 2: TRAJECTORY VECTOR                 */}
                             {/* ============================================ */}
                             <TrajectoryVector city={selectedCity} targetDate={selectedDate} />
+
+                            {/* ============================================ */}
+                            {/*  MODULE 3: SURGE OVERLAY                     */}
+                            {/* ============================================ */}
+                            <Module3SurgeOverlay result={result} />
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -952,5 +969,76 @@ function TrajectoryVector({ city, targetDate }: { city: string; targetDate: stri
                 </div>
             </div>
         </motion.div>
+    );
+}
+
+/* =========================================== */
+/*  Module 3: Intensity Index & Surge Overlay  */
+/* =========================================== */
+function Module3SurgeOverlay({ result }: { result: PredictionResult }) {
+    if (!result.forecast_7_day || result.forecast_7_day.length === 0) return null;
+
+    return (
+        <div className="glass-panel rounded-3xl p-8 mt-8 border border-red-500/20 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, var(--veridian-accent) 0px, transparent 1px, transparent 10px)`
+                }} />
+            </div>
+
+            <div className="relative z-10">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                                <Activity size={20} className="text-red-400" />
+                            </div>
+                            <h3 className="text-xl font-bold">T-SMART: Intensity Index & Surge Overlay</h3>
+                        </div>
+                        <p className="text-foreground/50 text-sm max-w-2xl pl-13">
+                            <span className="text-red-400 font-medium">Module 3 (Impact Logic):</span> Analyzed the highest 10-year historically recorded peaks for this specific time of year (valuing recent years 20% more). The resulting <strong>Intensity Value ({result.intensity_index.value.toFixed(1)})</strong> is overlaid as a 7-day Gaussian surge on top of the baseline forecast.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="h-[250px] w-full mt-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={result.forecast_7_day} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="surgeGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
+                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                tickFormatter={(val) => {
+                                    const d = new Date(val);
+                                    return `${d.getMonth() + 1}/${d.getDate()}`;
+                                }}
+                            />
+                            <YAxis
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#1a2012', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                itemStyle={{ color: '#fff' }}
+                                labelFormatter={(label) => new Date(label as string).toLocaleDateString()}
+                            />
+                            <ReferenceLine x={result.prediction.date} stroke="rgba(255,255,255,0.4)" strokeDasharray="3 3" label={{ position: 'top', value: 'Anchor Date', fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+                            <Area type="monotone" dataKey="baseline" stackId="1" stroke="var(--veridian-primary)" fill="var(--veridian-primary)" fillOpacity={0.2} name="WPHA Baseline" />
+                            <Area type="monotone" dataKey="surge_magnitude" stackId="1" stroke="#ef4444" fill="url(#surgeGradient)" name="Surge Overlay" />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        </div>
     );
 }

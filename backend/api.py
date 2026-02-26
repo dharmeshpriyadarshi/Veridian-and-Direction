@@ -269,6 +269,49 @@ def predict_anchor(date: str, city: str = "Delhi"):
             )
         })
     
+    # ============================================================
+    # MODULE 3: THE INTENSITY INDEX & SURGE OVERLAY
+    # ============================================================
+    # 1. Intensity Index Calculation: Weighted average of 10-year historical peaks for this 7-day window.
+    yearly_peaks = {}
+    for year in years_in_data:
+        year_df = city_df_indexed[city_df_indexed['Date'].dt.year == year]
+        window_df = year_df[(year_df['DayOfYear'] >= target_doy - 3) & (year_df['DayOfYear'] <= target_doy + 3)]
+        if not window_df.empty and has_aqi_col:
+            yearly_peaks[year] = float(window_df['AQI'].max())
+
+    weighted_sum = 0
+    weight_total = 0
+    for year, peak in yearly_peaks.items():
+        w = 1.2 if year in [2022, 2023, 2024] else 1.0
+        weighted_sum += peak * w
+        weight_total += w
+    intensity_value = weighted_sum / weight_total if weight_total > 0 else (aqi_stats["mean"] if aqi_stats else 0)
+
+    # 2. Surge Overlay Logic: Gaussian Bell Curve across 7-day window
+    baseline_aqi = aqi_stats["mean"] if aqi_stats else 0
+    # The max value of the surge added to the baseline should reach the IntensityValue
+    surge_max = max(0, intensity_value - baseline_aqi)
+    
+    forecast_7_day = []
+    target_dt = pd.to_datetime(date)
+    for i in range(-3, 4):
+        day_dt = target_dt + pd.Timedelta(days=i)
+        
+        # Gaussian curve focused on day 0 (the target centroid)
+        # using sigma=1.2 to give a nice bell curve across 7 days
+        sigma = 1.2
+        surge_mag = surge_max * np.exp(- (i**2) / (2 * sigma**2))
+        
+        forecast_7_day.append({
+            "date": day_dt.strftime('%Y-%m-%d'),
+            "day_offset": i,
+            "baseline": round(baseline_aqi, 1),
+            "surge_magnitude": round(surge_mag, 1),
+            "is_surge": bool(surge_mag > (surge_max * 0.1)), # True if surge magnitude is > 10% of max
+            "predicted_aqi": round(baseline_aqi + surge_mag, 1)
+        })
+
     # Build the prediction response
     sample_size = primary["sample_size"]
     
@@ -296,6 +339,11 @@ def predict_anchor(date: str, city: str = "Delhi"):
             "std_dev": round(primary["std_dev"], 1),
             "aqi_stats": aqi_stats,
             "pm25_stats": pm25_stats,
+        },
+        "forecast_7_day": forecast_7_day,
+        "intensity_index": {
+            "value": round(intensity_value, 1),
+            "surge_max": round(surge_max, 1)
         },
         "yearly_breakdown": yearly_breakdown,
         "evaluation": {
