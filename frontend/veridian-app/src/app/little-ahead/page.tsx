@@ -519,7 +519,10 @@ export default function LittleAheadPage() {
                             {/* ============================================ */}
                             {/*  HISTORICAL DRIFT TABLE (Module 1)           */}
                             {/* ============================================ */}
-                            <HistoricalDriftTable />
+                            <HistoricalDriftTable
+                                defaultCity={selectedCity}
+                                defaultMonth={selectedDate ? parseInt(selectedDate.split('-')[1], 10) : 1}
+                            />
 
                             {/* ============================================ */}
                             {/*  METHOD 2: TRAJECTORY VECTOR                 */}
@@ -585,10 +588,10 @@ interface HistoricalSpike {
     peak_aqi_average: number;
 }
 
-function HistoricalDriftTable() {
+function HistoricalDriftTable({ defaultCity = "Delhi", defaultMonth = 1 }: { defaultCity?: string; defaultMonth?: number }) {
     const [spikes, setSpikes] = useState<HistoricalSpike[]>([]);
-    const [selectedMonth, setSelectedMonth] = useState<number>(1);
-    const [selectedCity, setSelectedCity] = useState<string>("Delhi");
+    const [selectedMonth, setSelectedMonth] = useState<number>(defaultMonth);
+    const [selectedCity, setSelectedCity] = useState<string>(defaultCity);
     const [cities, setCities] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -601,6 +604,12 @@ function HistoricalDriftTable() {
             })
             .catch(() => setCities(["Delhi"])); // fallback
     }, []);
+
+    // Sync state when props change
+    useEffect(() => {
+        if (defaultCity) setSelectedCity(defaultCity);
+        if (defaultMonth) setSelectedMonth(defaultMonth);
+    }, [defaultCity, defaultMonth]);
 
     // Load spikes when city changes
     useEffect(() => {
