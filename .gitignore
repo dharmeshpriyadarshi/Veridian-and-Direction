@@ -2,6 +2,7 @@
 # DATA (DO NOT PUSH)
 # ========================
 data/
+data/processed/city_day_cleaned.csv
 
 # ========================
 # PYTHON
