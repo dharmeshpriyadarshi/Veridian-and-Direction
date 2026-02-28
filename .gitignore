@@ -3,6 +3,8 @@
 # ========================
 data/
 data/processed/city_day_cleaned.csv
+data/processed/city_day_enriched.csv
+data/processed/city_day_features.csv
 
 # ========================
 # PYTHON
