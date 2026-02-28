@@ -39,6 +39,35 @@ interface SarimaxData {
     };
 }
 
+interface TsmartData {
+    city: string;
+    target_date: string;
+    intensity_adjustment: {
+        factor: number;
+        percentage: number;
+        historical_base_year: string;
+    };
+    insight_narrative: {
+        trajectory_name: string;
+        drift_summary: string;
+        narrative_notes: string[];
+        confidence_score: string;
+    };
+    signature_comparison: {
+        date: string;
+        current_window: number;
+        historical_match: number;
+    }[];
+    timeseries: {
+        date: string;
+        predicted_aqi: number;
+    }[];
+    sarimax_overlay: {
+        date: string;
+        sarimax_aqi: number;
+    }[];
+}
+
 const CITIES = ["Delhi", "Mumbai", "Kolkata", "Chennai", "Bangalore"];
 const TARGET_DATE = "2026-12-31"; // Default forecast horizon for the dashboard
 
@@ -52,7 +81,11 @@ export default function ResearchPage() {
     const [selectedCity, setSelectedCity] = useState("Delhi");
     const [activeModel, setActiveModel] = useState<"SARIMAX" | "T-SMART">("SARIMAX");
     const [sarimaxData, setSarimaxData] = useState<SarimaxData | null>(null);
+    const [tsmartData, setTsmartData] = useState<TsmartData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    // T-SMART Features
+    const [showSarimaxOverlay, setShowSarimaxOverlay] = useState(false);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -81,11 +114,45 @@ export default function ResearchPage() {
         }
     };
 
+    const fetchTsmartData = async (city: string) => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`http://localhost:8000/predict/tsmart?city=${city}&target_date=${TARGET_DATE}`, {
+                method: "POST"
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setTsmartData(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch T-SMART data:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        if (isLoggedIn && activeModel === "SARIMAX") {
-            fetchSarimaxData(selectedCity);
+        if (isLoggedIn) {
+            if (activeModel === "SARIMAX") {
+                fetchSarimaxData(selectedCity);
+            } else if (activeModel === "T-SMART") {
+                fetchTsmartData(selectedCity);
+            }
         }
     }, [isLoggedIn, selectedCity, activeModel]);
+
+    // Data Transformation for the T-SMART Combined Chart
+    const formatTsmartChartData = () => {
+        if (!tsmartData) return [];
+        return tsmartData.timeseries.map(pt => {
+            const overlayMatch = tsmartData.sarimax_overlay.find(so => so.date === pt.date);
+            return {
+                date: pt.date,
+                predicted_aqi: pt.predicted_aqi,
+                sarimax_aqi: overlayMatch ? overlayMatch.sarimax_aqi : null
+            };
+        });
+    };
 
     // Data Transformation for the Bar Chart
     const formatCausalityData = () => {
@@ -256,16 +323,136 @@ export default function ResearchPage() {
 
                 {/* RIGHT CONTENT AREA (Visualizations) */}
                 <div className="lg:col-span-9 space-y-6">
-                    {/* T-SMART PLACEHOLDER */}
+                    {/* T-SMART FULL VIEW */}
                     {activeModel === "T-SMART" && (
-                        <div className="w-full h-full min-h-[500px] glass-panel rounded-2xl border border-[#00FF94]/20 flex flex-col items-center justify-center p-12 text-center bg-[#00FF94]/5">
-                            <Brain size={64} className="text-[#00FF94] mb-6 opacity-80" />
-                            <h2 className="text-2xl font-bold mb-3">T-SMART Module Integration Pending</h2>
-                            <p className="text-white/60 max-w-xl">
-                                The Adaptive Deep Learning Engine (Model 2) dashboard is structurally prepared.
-                                It will be mapped to visualize dynamic non-linear trend matching once the comparative layer is fully constructed.
-                            </p>
-                        </div>
+                        <>
+                            {isLoading ? (
+                                <div className="w-full h-[400px] glass-panel rounded-2xl border border-[#00FF94]/20 flex items-center justify-center bg-[#00FF94]/5">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF94]"></div>
+                                </div>
+                            ) : tsmartData ? (
+                                <>
+                                    {/* Main TimeSeries Chart with Overlay Toggle */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10 relative">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div>
+                                                <h2 className="text-xl font-bold">{selectedCity} - 2026 Forecast Trajectory</h2>
+                                                <p className="text-sm text-white/50">T-SMART Engine | Adaptive DTW Match</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-lg border border-white/10 transition-colors hover:bg-white/10">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="sarimaxOverlay"
+                                                        checked={showSarimaxOverlay}
+                                                        onChange={(e) => setShowSarimaxOverlay(e.target.checked)}
+                                                        className="accent-[#00FF94] w-4 h-4 cursor-pointer"
+                                                    />
+                                                    <label htmlFor="sarimaxOverlay" className="text-sm font-semibold cursor-pointer select-none text-white/80 hover:text-white transition-colors">Overlay SARIMAX Baseline</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="h-[400px] w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={formatTsmartChartData()} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                                    <defs>
+                                                        <linearGradient id="colorAqiTsmart" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#00FF94" stopOpacity={0.3} />
+                                                            <stop offset="95%" stopColor="#00FF94" stopOpacity={0} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                                                    <XAxis
+                                                        dataKey="date"
+                                                        stroke="#ffffff50"
+                                                        tick={{ fill: '#ffffff50', fontSize: 12 }}
+                                                        tickFormatter={(val) => {
+                                                            const d = new Date(val);
+                                                            return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
+                                                        }}
+                                                        minTickGap={50}
+                                                    />
+                                                    <YAxis stroke="#ffffff50" tick={{ fill: '#ffffff50', fontSize: 12 }} domain={[0, 'auto']} />
+                                                    <RechartsTooltip contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }} />
+
+                                                    <Area type="monotone" name="T-SMART Adjusted Drift" dataKey="predicted_aqi" stroke="#00FF94" fill="url(#colorAqiTsmart)" strokeWidth={2} />
+
+                                                    {showSarimaxOverlay && (
+                                                        <Line type="monotone" name="SARIMAX Seasonal Mean" dataKey="sarimax_aqi" stroke="#ffffff40" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                                                    )}
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    {/* Pattern Match & Insight Row */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+
+                                        {/* Signature Match Mini-Chart */}
+                                        <div className="glass-panel p-6 rounded-2xl border border-white/10 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#00FF94]/5 rounded-bl-full -z-10 blur-2xl"></div>
+
+                                            <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
+                                                <Activity size={18} className="text-[#00FF94]" /> Signature Match
+                                            </h3>
+                                            <p className="text-xs text-white/50 mb-6">Comparing current 14-day context window against {tsmartData.intensity_adjustment.historical_base_year} historical match.</p>
+
+                                            <div className="h-[200px] w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={tsmartData.signature_comparison} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+                                                        <XAxis
+                                                            dataKey="date"
+                                                            stroke="#ffffff30"
+                                                            tick={{ fontSize: 10 }}
+                                                            tickFormatter={(v) => new Date(v).getDate().toString()}
+                                                        />
+                                                        <YAxis stroke="#ffffff30" tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                                                        <RechartsTooltip contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }} />
+
+                                                        <Line type="monotone" name="Historical Target" dataKey="historical_match" stroke="#ffffff40" strokeDasharray="4 4" dot={false} />
+                                                        <Line type="monotone" name="Current Context" dataKey="current_window" stroke="#00FF94" strokeWidth={2} dot={{ r: 3, fill: '#050A07', stroke: '#00FF94', strokeWidth: 2 }} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+
+                                        {/* Insight Engine Card */}
+                                        <div className="glass-panel p-6 rounded-2xl border border-white/10 flex flex-col justify-between">
+                                            <div>
+                                                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                                                    <Brain size={18} className="text-[#00FF94]" /> Deep Observation
+                                                </h3>
+                                                <div className="mb-4">
+                                                    <h4 className="text-[#00FF94] font-semibold text-lg">{tsmartData.insight_narrative.trajectory_name}</h4>
+                                                    <p className="text-sm text-white/80 leading-relaxed mt-2">{tsmartData.insight_narrative.drift_summary}</p>
+                                                </div>
+
+                                                <div className="space-y-2 mt-6">
+                                                    {tsmartData.insight_narrative.narrative_notes.map((note, idx) => (
+                                                        <div key={idx} className="bg-[#00FF94]/5 border border-[#00FF94]/20 px-4 py-3 rounded-lg text-xs leading-relaxed flex items-center gap-3 text-white/90">
+                                                            <div className="w-2 h-2 rounded-full bg-[#00FF94] shrink-0" />
+                                                            {note}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
+                                                <span className="text-xs text-white/50 uppercase tracking-widest">Confidence Score</span>
+                                                <span className="text-2xl font-mono text-[#00FF94] font-bold">{tsmartData.insight_narrative.confidence_score}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="w-full h-[400px] glass-panel rounded-2xl border border-[#ef4444]/20 flex flex-col items-center justify-center p-12 text-center bg-[#ef4444]/5">
+                                    <h2 className="text-2xl font-bold mb-3 text-[#ef4444]">Failed to load T-SMART data</h2>
+                                    <p className="text-white/60">Module integration is pending or returned an error.</p>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {/* SARIMAX FULL VIEW */}

@@ -555,6 +555,146 @@ def get_tsmart_insights(req: InsightRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
+# NEW: MODEL 2 T-SMART ENDPOINT
+# =====================================================
+@app.post("/predict/tsmart")
+def predict_tsmart(city: str, target_date: str):
+    """
+    Returns the T-SMART forecast using DTW (Module 2).
+    Includes the Variance-Adjusted Surge and WPHA Fallback.
+    Also fetches the SARIMAX overlay for comparison.
+    """
+    try:
+        # Load dataset
+        data_path = os.path.join(ROOT_DIR, "data", "raw", "city_day.csv")
+        df = load_data(data_path)
+        
+        # 1. Module 2: Trajectory Vector (DTW Search)
+        tsmart_result = extract_trajectory_vector(df, city=city, target_date=target_date, window_size=14, forecast_horizon=7)
+        
+        if "error" in tsmart_result:
+            raise HTTPException(status_code=400, detail=tsmart_result["error"])
+            
+        # 2. Extract Baseline and Historical Match
+        baseline_aqi = tsmart_result["baseline_aqi"]
+        best_match = tsmart_result["historical_matches"][0]
+        historical_aqi = best_match["historical_aqi"]
+        subsequent_aqi = best_match["subsequent_aqi"]
+        
+        # 3. Variance-Adjusted Surge (Magnitude Scaling Factor)
+        current_intensity = np.mean(baseline_aqi)
+        historical_intensity = np.mean(historical_aqi)
+        
+        if historical_intensity > 0:
+            scaling_factor = current_intensity / historical_intensity
+        else:
+            scaling_factor = 1.0
+            
+        intensity_adjustment_pct = (scaling_factor - 1.0) * 100
+        
+        adjusted_subsequent_aqi = [max(0, round(val * scaling_factor, 1)) for val in subsequent_aqi]
+        adjusted_drift = adjusted_subsequent_aqi[-1] - baseline_aqi[-1]
+        
+        # 4. Narrative Integration (Insight Engine)
+        insight_req = InsightRequest(
+            city=city,
+            drift_velocity=adjusted_drift,
+            intensity_index=current_intensity,
+            historical_mean=historical_intensity,
+            target_date=target_date
+        )
+        insight_data = generate_research_narrative(insight_req)
+        
+        is_fallback = False
+        latest_date_in_db = df[df['City'] == city]['Date'].max()
+        target_dt = pd.to_datetime(target_date)
+        
+        if target_dt > latest_date_in_db:
+             is_fallback = True
+             
+        narrative_notes = []
+        sign = "+" if intensity_adjustment_pct >= 0 else ""
+        narrative_notes.append(f"Intensity Adjusted: {sign}{intensity_adjustment_pct:.1f}% vs. {best_match['start_date'][:4]} Baseline")
+        
+        if is_fallback:
+            narrative_notes.append("Simulated 14-day window used for late-year trajectory matching.")
+            
+        insight_data["narrative_notes"] = narrative_notes
+        
+        # 5. Build Timeseries array
+        start_forecast_dt = pd.to_datetime(target_date) + pd.Timedelta(days=1)
+        forecast_dates = [ (start_forecast_dt + pd.Timedelta(days=i)).strftime('%Y-%m-%d') for i in range(len(adjusted_subsequent_aqi)) ]
+        
+        timeseries = []
+        for i in range(len(forecast_dates)):
+            timeseries.append({
+                "date": forecast_dates[i],
+                "predicted_aqi": adjusted_subsequent_aqi[i]
+            })
+            
+        # 6. Build Signature Comparison Object
+        end_baseline_dt = pd.to_datetime(target_date)
+        if is_fallback:
+             end_baseline_dt = end_baseline_dt.replace(year=latest_date_in_db.year)
+             
+        signature_dates = [ (end_baseline_dt - pd.Timedelta(days=13-i)).strftime('%Y-%m-%d') for i in range(14) ]
+        signature_dates.reverse()
+        
+        signature_comparison = []
+        for i in range(14):
+            signature_comparison.append({
+                "date": signature_dates[i],
+                "current_window": baseline_aqi[i],
+                "historical_match": historical_aqi[i]
+            })
+            
+        # 7. Pre-fetch SARIMAX Overlay for Comparative Overlay
+        sarimax_overlay = []
+        end_forecast_date = forecast_dates[-1]
+        try:
+            proxy_exog = generate_proxy(city, end_forecast_date)
+            sarimax_steps = len(proxy_exog)
+            sarimax_model_path = os.path.join(ROOT_DIR, "models", "sarimax", f"{city.lower().replace(' ', '_')}_model.pkl")
+            with open(sarimax_model_path, "rb") as f:
+                s_model = pickle.load(f)
+            s_forecast = s_model.get_forecast(steps=sarimax_steps, exog=proxy_exog)
+            s_mean = s_forecast.predicted_mean
+            
+            for fd in forecast_dates:
+                fd_dt = pd.to_datetime(fd)
+                if fd_dt in s_mean.index:
+                    val = s_mean.loc[fd_dt]
+                    meta_path = os.path.join(ROOT_DIR, "models", "sarimax", "model_metadata.json")
+                    with open(meta_path, "r") as mf:
+                        m_meta = json.load(mf).get(city, {})
+                        if m_meta.get("log_transform_used", False):
+                            val = np.expm1(val)
+                    sarimax_overlay.append({
+                        "date": fd,
+                        "sarimax_aqi": max(0.0, round(float(val), 1))
+                    })
+        except Exception as e:
+            print(f"Error prefetching SARIMAX overlay: {e}")
+            pass
+            
+        return {
+            "city": city,
+            "target_date": target_date,
+            "intensity_adjustment": {
+                "factor": round(scaling_factor, 2),
+                "percentage": round(intensity_adjustment_pct, 1),
+                "historical_base_year": best_match["start_date"][:4]
+            },
+            "insight_narrative": insight_data,
+            "signature_comparison": signature_comparison,
+            "timeseries": timeseries,
+            "sarimax_overlay": sarimax_overlay
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
 # NEW: MODEL 3 SARIMAX ENDPOINT
 # =====================================================
 @app.post("/predict/sarimax")
