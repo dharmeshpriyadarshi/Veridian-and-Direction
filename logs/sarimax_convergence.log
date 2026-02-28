@@ -1,0 +1,4 @@
+2026-02-28 13:47:12,280 - WARNING - City: Chennai - Convergence Warning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+2026-02-28 13:47:31,075 - WARNING - City: Delhi - Convergence Warning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+2026-02-28 13:47:45,339 - WARNING - City: Kolkata - Convergence Warning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+2026-02-28 13:48:00,740 - WARNING - City: Mumbai - Convergence Warning: Maximum Likelihood optimization failed to converge. Check mle_retvals
