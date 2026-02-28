@@ -16,6 +16,12 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Go up 
 sys.path.insert(0, os.path.join(ROOT_DIR, 'ml_engine'))
 from main import load_data, preprocess_data, calculate_probabilistic_stats
 from tsmart_module2 import extract_trajectory_vector
+import pickle
+import json
+
+# Add scripts directory to path for generate_proxy
+sys.path.insert(0, os.path.join(ROOT_DIR, 'scripts'))
+from generate_weather_proxy import generate_proxy
 
 app = FastAPI()
 
@@ -540,5 +546,87 @@ def get_tsmart_insights(req: InsightRequest):
     """
     try:
         return generate_research_narrative(req)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# NEW: MODEL 3 SARIMAX ENDPOINT
+# =====================================================
+@app.post("/predict/sarimax")
+def predict_sarimax(city: str, target_date: str):
+    """
+    Returns the SARIMAX 2026 forecast using the 10-year meteorological proxy engine.
+    Also returns the 95% Confidence Intervals.
+    """
+    try:
+        t_date = pd.to_datetime(target_date)
+        if t_date < pd.to_datetime("2025-01-01"):
+            raise HTTPException(status_code=400, detail="SARIMAX out-of-sample forecasting starts from 2025-01-01")
+            
+        # 1. Load Model Metadata to check log_transform status
+        metadata_path = os.path.join(ROOT_DIR, "models", "sarimax", "model_metadata.json")
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+            
+        if city not in metadata:
+            raise HTTPException(status_code=404, detail=f"SARIMAX model for {city} not found.")
+            
+        city_meta = metadata[city]
+        is_log_transformed = city_meta.get("log_transform_used", False)
+        
+        # 2. Load Model Object
+        model_path = os.path.join(ROOT_DIR, "models", "sarimax", f"{city.lower().replace(' ', '_')}_model.pkl")
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+            
+        # 3. Generate Weather Proxy
+        # This will create a daily dataframe from 2025-01-01 up to target_date
+        proxy_exog = generate_proxy(city, target_date)
+        steps = len(proxy_exog) # The number of out-of-sample days
+        
+        # 4. Continuous State-Space Forecasting
+        forecast_obj = model.get_forecast(steps=steps, exog=proxy_exog)
+        predicted_mean = forecast_obj.predicted_mean
+        
+        # In statsmodels 0.14+, conf_int() might return a numpy array or a DataFrame
+        # depending on whether the exogenous was a pandas object
+        conf_int = forecast_obj.conf_int(alpha=0.05) # 95% CI
+        
+        if isinstance(conf_int, pd.DataFrame):
+            lower_idx = conf_int.columns[0]
+            upper_idx = conf_int.columns[1]
+            target_lower = conf_int.iloc[-1][lower_idx]
+            target_upper = conf_int.iloc[-1][upper_idx]
+        else:
+            # It's a numpy array
+            target_lower = conf_int[-1, 0]
+            target_upper = conf_int[-1, 1]
+            
+        # Get the target date value (the last step)
+        target_pred = predicted_mean.iloc[-1] if isinstance(predicted_mean, pd.Series) else predicted_mean[-1]
+        
+        # 5. Transformation Inversion & Physical Bounds
+        if is_log_transformed:
+            target_pred = np.expm1(target_pred)
+            target_lower = np.expm1(target_lower)
+            target_upper = np.expm1(target_upper)
+            
+        # Clip at AQI = 0
+        target_pred = max(0.0, float(target_pred))
+        target_lower = max(0.0, float(target_lower))
+        target_upper = max(0.0, float(target_upper))
+        
+        return {
+            "model_name": "SARIMAX (1,1,1)x(1,1,1,12)",
+            "city": city,
+            "target_date": target_date,
+            "predicted_aqi": round(target_pred, 1),
+            "lower_bound": round(target_lower, 1),
+            "upper_bound": round(target_upper, 1),
+            "horizon_days": steps,
+            "log_transformed_in_training": is_log_transformed,
+            "metrics_on_test_set": city_meta.get("metrics", {})
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
