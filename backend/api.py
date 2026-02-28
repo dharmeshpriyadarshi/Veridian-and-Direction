@@ -18,12 +18,17 @@ from main import load_data, preprocess_data, calculate_probabilistic_stats
 from tsmart_module2 import extract_trajectory_vector
 import pickle
 import json
+from fastapi.staticfiles import StaticFiles
 
 # Add scripts directory to path for generate_proxy
 sys.path.insert(0, os.path.join(ROOT_DIR, 'scripts'))
 from generate_weather_proxy import generate_proxy
 
 app = FastAPI()
+
+# Mount diagnostic assets statically for the frontend
+ASSETS_DIR = os.path.join(ROOT_DIR, "assets")
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
 # Enable CORS for frontend integration
 app.add_middleware(
@@ -615,6 +620,52 @@ def predict_sarimax(city: str, target_date: str):
         target_pred = max(0.0, float(target_pred))
         target_lower = max(0.0, float(target_lower))
         target_upper = max(0.0, float(target_upper))
+        # 6. Extract Causality Weights
+        params = model.params
+        param_names = model.param_names if hasattr(model, 'param_names') else []
+        
+        # Convert params to a dictionary if it isn't one already
+        if not isinstance(params, dict):
+            # In statsmodels, params is a pandas Series or numpy array
+            if hasattr(params, 'index'):
+                param_dict = params.to_dict()
+            else:
+                param_dict = {name: val for name, val in zip(param_names, params)}
+        else:
+            param_dict = params
+            
+        # Safe extraction of exogenous weights
+        exo_weights = {
+            "Wind_Speed": round(float(param_dict.get("Wind_Speed", param_dict.get("exog.Wind_Speed", 0.0))), 4),
+            "Temperature": round(float(param_dict.get("Temperature", param_dict.get("exog.Temperature", 0.0))), 4),
+            "Humidity": round(float(param_dict.get("Humidity", param_dict.get("exog.Humidity", 0.0))), 4)
+        }
+        
+        # Safe extraction of AR(1) "System Memory" weight
+        ar_weight = round(float(param_dict.get("ar.L1", 0.0)), 4)
+        
+        # 7. Build Continuous Timeseries Array
+        timeseries = []
+        for i, dt in enumerate(proxy_exog.index):
+            pred_val = predicted_mean.iloc[i] if isinstance(predicted_mean, pd.Series) else predicted_mean[i]
+            if isinstance(conf_int, pd.DataFrame):
+                low_val = conf_int.iloc[i][conf_int.columns[0]]
+                up_val = conf_int.iloc[i][conf_int.columns[1]]
+            else:
+                low_val = conf_int[i, 0]
+                up_val = conf_int[i, 1]
+                
+            if is_log_transformed:
+                pred_val = np.expm1(pred_val)
+                low_val = np.expm1(low_val)
+                up_val = np.expm1(up_val)
+                
+            timeseries.append({
+                "date": dt.strftime('%Y-%m-%d'),
+                "predicted_aqi": max(0.0, round(float(pred_val), 1)),
+                "lower_bound": max(0.0, round(float(low_val), 1)),
+                "upper_bound": max(0.0, round(float(up_val), 1))
+            })
         
         return {
             "model_name": "SARIMAX (1,1,1)x(1,1,1,12)",
@@ -625,7 +676,13 @@ def predict_sarimax(city: str, target_date: str):
             "upper_bound": round(target_upper, 1),
             "horizon_days": steps,
             "log_transformed_in_training": is_log_transformed,
-            "metrics_on_test_set": city_meta.get("metrics", {})
+            "metrics_on_test_set": city_meta.get("metrics", {}),
+            "causality_weights": {
+                "exogenous": exo_weights,
+                "system_memory": ar_weight,
+                "note": "Relative Impact Weights (Exogenous features were standardized)"
+            },
+            "timeseries": timeseries
         }
 
     except Exception as e:
