@@ -37,3 +37,7 @@ historical_pm25.csv
 # ========================
 .venv/
 backend/.venv/
+
+# Ignore trained models
+models/
+*.pkl
