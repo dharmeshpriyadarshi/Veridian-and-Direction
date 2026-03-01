@@ -562,120 +562,172 @@ def predict_tsmart(city: str, target_date: str):
     """
     Returns the T-SMART forecast using DTW (Module 2).
     Includes the Variance-Adjusted Surge and WPHA Fallback.
-    Also fetches the SARIMAX overlay for comparison.
+    Now supports continuous 365-day trajectory generation via sliding window.
     """
     try:
         # Load dataset
         data_path = os.path.join(ROOT_DIR, "data", "raw", "city_day.csv")
         df = load_data(data_path)
         
-        # 1. Module 2: Trajectory Vector (DTW Search)
-        tsmart_result = extract_trajectory_vector(df, city=city, target_date=target_date, window_size=14, forecast_horizon=7)
+        target_dt = pd.to_datetime(target_date)
+        is_full_year = target_dt.year == 2026
         
-        if "error" in tsmart_result:
-            raise HTTPException(status_code=400, detail=tsmart_result["error"])
-            
-        # 2. Extract Baseline and Historical Match
-        baseline_aqi = tsmart_result["baseline_aqi"]
-        best_match = tsmart_result["historical_matches"][0]
-        historical_aqi = best_match["historical_aqi"]
-        subsequent_aqi = best_match["subsequent_aqi"]
-        
-        # 3. Variance-Adjusted Surge (Magnitude Scaling Factor)
-        current_intensity = np.mean(baseline_aqi)
-        historical_intensity = np.mean(historical_aqi)
-        
-        if historical_intensity > 0:
-            scaling_factor = current_intensity / historical_intensity
+        # 1. Sliding Window Loop
+        if is_full_year:
+            start_loop_dt = pd.to_datetime("2026-01-01")
+            loop_dates = pd.date_range(start=start_loop_dt, end=target_dt, freq='7D')
         else:
-            scaling_factor = 1.0
+            loop_dates = [target_dt]
             
-        intensity_adjustment_pct = (scaling_factor - 1.0) * 100
+        prediction_map = {}
+        max_scaling_factor = 1.0
+        max_intensity_pct = 0.0
+        best_match_year = "2020"
         
-        adjusted_subsequent_aqi = [max(0, round(val * scaling_factor, 1)) for val in subsequent_aqi]
-        adjusted_drift = adjusted_subsequent_aqi[-1] - baseline_aqi[-1]
+        # For Narrative (we keep the latest drift/intensity for context if it's a single date, or max peak if year)
+        overall_peak_intensity = 0.0
+        overall_peak_drift = 0.0
         
+        latest_date_in_db = df['Date'].max()
+        has_fallback = False
+        
+        signature_comparison = []
+
+        for step_dt in loop_dates:
+            step_date_str = step_dt.strftime('%Y-%m-%d')
+            
+            if step_dt > latest_date_in_db:
+                has_fallback = True
+
+            # DTW Search (forecast_horizon=14 to allow overlapping with 7-day steps)
+            tsmart_result = extract_trajectory_vector(df, city=city, target_date=step_date_str, window_size=14, forecast_horizon=14)
+            
+            if "error" in tsmart_result:
+                if not is_full_year:
+                    raise HTTPException(status_code=400, detail=tsmart_result["error"])
+                continue
+                
+            baseline_aqi = tsmart_result["baseline_aqi"]
+            best_match = tsmart_result["historical_matches"][0]
+            historical_aqi = best_match["historical_aqi"]
+            subsequent_aqi = best_match["subsequent_aqi"]
+            
+            current_intensity = np.mean(baseline_aqi)
+            historical_intensity = np.mean(historical_aqi)
+            
+            scaling_factor = current_intensity / historical_intensity if historical_intensity > 0 else 1.0
+            intensity_adjustment_pct = (scaling_factor - 1.0) * 100
+            
+            if intensity_adjustment_pct > max_intensity_pct:
+                max_intensity_pct = intensity_adjustment_pct
+                max_scaling_factor = scaling_factor
+                best_match_year = best_match["start_date"][:4]
+                overall_peak_intensity = current_intensity
+                overall_peak_drift = (subsequent_aqi[-1] * scaling_factor) - baseline_aqi[-1]
+                
+            adjusted_subsequent_aqi = [max(0, round(val * scaling_factor, 1)) for val in subsequent_aqi]
+            
+            start_forecast_dt = step_dt + pd.Timedelta(days=1)
+            for i, val in enumerate(adjusted_subsequent_aqi):
+                fd_str = (start_forecast_dt + pd.Timedelta(days=i)).strftime('%Y-%m-%d')
+                if fd_str not in prediction_map:
+                    prediction_map[fd_str] = []
+                prediction_map[fd_str].append(val)
+                
+            # If it's single date, we populate signature_comparison with exact window. Otherwise just use last one.
+            if len(loop_dates) == 1 or step_dt == loop_dates[-1]:
+                end_baseline_dt = step_dt
+                if step_dt > latest_date_in_db:
+                     end_baseline_dt = end_baseline_dt.replace(year=latest_date_in_db.year)
+                signature_dates = [ (end_baseline_dt - pd.Timedelta(days=13-i)).strftime('%Y-%m-%d') for i in range(14) ]
+                signature_dates.reverse()
+
+                signature_comparison = []
+                for i in range(14):
+                    signature_comparison.append({
+                        "date": signature_dates[i],
+                        "current_window": baseline_aqi[i],
+                        "historical_match": historical_aqi[i]
+                    })
+                    
+        # Stitch arrays using Weighted Average (or simple mean for now)
+        forecast_dates = sorted(list(prediction_map.keys()))
+        timeseries = []
+        for fd in forecast_dates:
+            vals = prediction_map[fd]
+            timeseries.append({
+                "date": fd,
+                "predicted_aqi": round(float(np.mean(vals)), 1)
+            })
         # 4. Narrative Integration (Insight Engine)
         insight_req = InsightRequest(
             city=city,
-            drift_velocity=adjusted_drift,
-            intensity_index=current_intensity,
-            historical_mean=historical_intensity,
+            drift_velocity=overall_peak_drift,
+            intensity_index=overall_peak_intensity,
+            historical_mean=overall_peak_intensity / max_scaling_factor if max_scaling_factor > 0 else 1.0,
             target_date=target_date
         )
         insight_data = generate_research_narrative(insight_req)
-        
-        is_fallback = False
-        latest_date_in_db = df[df['City'] == city]['Date'].max()
-        target_dt = pd.to_datetime(target_date)
-        
-        if target_dt > latest_date_in_db:
-             is_fallback = True
              
         narrative_notes = []
-        sign = "+" if intensity_adjustment_pct >= 0 else ""
-        narrative_notes.append(f"Intensity Adjusted: {sign}{intensity_adjustment_pct:.1f}% vs. {best_match['start_date'][:4]} Baseline")
+        sign = "+" if max_intensity_pct >= 0 else ""
+        narrative_notes.append(f"Intensity Adjusted: {sign}{max_intensity_pct:.1f}% vs. {best_match_year} Baseline")
         
-        if is_fallback:
+        if has_fallback:
             narrative_notes.append("Simulated 14-day window used for late-year trajectory matching.")
             
-        insight_data["narrative_notes"] = narrative_notes
+        # We will append narrative_notes to insight_data below, after calculating SARIMAX deviations.
         
-        # 5. Build Timeseries array
-        start_forecast_dt = pd.to_datetime(target_date) + pd.Timedelta(days=1)
-        forecast_dates = [ (start_forecast_dt + pd.Timedelta(days=i)).strftime('%Y-%m-%d') for i in range(len(adjusted_subsequent_aqi)) ]
-        
-        timeseries = []
-        for i in range(len(forecast_dates)):
-            timeseries.append({
-                "date": forecast_dates[i],
-                "predicted_aqi": adjusted_subsequent_aqi[i]
-            })
-            
-        # 6. Build Signature Comparison Object
-        end_baseline_dt = pd.to_datetime(target_date)
-        if is_fallback:
-             end_baseline_dt = end_baseline_dt.replace(year=latest_date_in_db.year)
-             
-        signature_dates = [ (end_baseline_dt - pd.Timedelta(days=13-i)).strftime('%Y-%m-%d') for i in range(14) ]
-        signature_dates.reverse()
-        
-        signature_comparison = []
-        for i in range(14):
-            signature_comparison.append({
-                "date": signature_dates[i],
-                "current_window": baseline_aqi[i],
-                "historical_match": historical_aqi[i]
-            })
-            
-        # 7. Pre-fetch SARIMAX Overlay for Comparative Overlay
+        # 5. Pre-fetch SARIMAX Overlay for Comparative Overlay
         sarimax_overlay = []
-        end_forecast_date = forecast_dates[-1]
-        try:
-            proxy_exog = generate_proxy(city, end_forecast_date)
-            sarimax_steps = len(proxy_exog)
-            sarimax_model_path = os.path.join(ROOT_DIR, "models", "sarimax", f"{city.lower().replace(' ', '_')}_model.pkl")
-            with open(sarimax_model_path, "rb") as f:
-                s_model = pickle.load(f)
-            s_forecast = s_model.get_forecast(steps=sarimax_steps, exog=proxy_exog)
-            s_mean = s_forecast.predicted_mean
-            
-            for fd in forecast_dates:
-                fd_dt = pd.to_datetime(fd)
-                if fd_dt in s_mean.index:
-                    val = s_mean.loc[fd_dt]
-                    meta_path = os.path.join(ROOT_DIR, "models", "sarimax", "model_metadata.json")
+        if len(forecast_dates) > 0:
+            end_forecast_date = forecast_dates[-1]
+            try:
+                proxy_exog = generate_proxy(city, end_forecast_date)
+                sarimax_steps = len(proxy_exog)
+                sarimax_model_path = os.path.join(ROOT_DIR, "models", "sarimax", f"{city.lower().replace(' ', '_')}_model.pkl")
+                with open(sarimax_model_path, "rb") as f:
+                    s_model = pickle.load(f)
+                s_forecast = s_model.get_forecast(steps=sarimax_steps, exog=proxy_exog)
+                
+                # Extract raw numpy array
+                s_mean_array = s_forecast.predicted_mean.values
+                proxy_dates = pd.to_datetime(proxy_exog.index)
+                
+                # Read metadata for potential log inverse
+                meta_path = os.path.join(ROOT_DIR, "models", "sarimax", "model_metadata.json")
+                m_meta = {}
+                if os.path.exists(meta_path):
                     with open(meta_path, "r") as mf:
                         m_meta = json.load(mf).get(city, {})
-                        if m_meta.get("log_transform_used", False):
-                            val = np.expm1(val)
-                    sarimax_overlay.append({
-                        "date": fd,
-                        "sarimax_aqi": max(0.0, round(float(val), 1))
-                    })
-        except Exception as e:
-            print(f"Error prefetching SARIMAX overlay: {e}")
-            pass
+                
+                # Map values back by index position
+                for fd in forecast_dates:
+                    fd_dt = pd.to_datetime(fd)
+                    if fd_dt in proxy_dates:
+                        idx = proxy_dates.get_loc(fd_dt)
+                        if idx < len(s_mean_array):
+                            val = s_mean_array[idx]
+                            if m_meta.get("log_transform_used", False):
+                                val = np.expm1(val)
+                            sarimax_overlay.append({
+                                "date": fd,
+                                "sarimax_aqi": max(0.0, round(float(val), 1))
+                            })
+            except Exception as e:
+                print(f"Error prefetching SARIMAX overlay: {e}")
+                import traceback
+                traceback.print_exc()
+                pass
+                
+        # 6. Flag "Non-Linear Spike Deviation"
+        if len(sarimax_overlay) > 0 and len(timeseries) > 0:
+            max_tsmart = max([t["predicted_aqi"] for t in timeseries])
+            max_sarimax = max([s["sarimax_aqi"] for s in sarimax_overlay])
+            if max_tsmart > max_sarimax * 1.15:  # e.g., 15% higher intensity than SARIMAX baseline
+                narrative_notes.append("⚠️ Non-Linear Spike Deviation detected versus SARIMAX baseline.")
+                
+        insight_data["narrative_notes"] = narrative_notes
             
         return {
             "city": city,
