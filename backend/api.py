@@ -592,6 +592,8 @@ def predict_tsmart(city: str, target_date: str):
         has_fallback = False
         
         signature_comparison = []
+        drift_days_list = []
+        matched_years_list = []
 
         for step_dt in loop_dates:
             step_date_str = step_dt.strftime('%Y-%m-%d')
@@ -624,6 +626,20 @@ def predict_tsmart(city: str, target_date: str):
                 best_match_year = best_match["start_date"][:4]
                 overall_peak_intensity = current_intensity
                 overall_peak_drift = (subsequent_aqi[-1] * scaling_factor) - baseline_aqi[-1]
+                
+            best_match_year_curr = best_match["start_date"][:4]
+            matched_years_list.append({
+                "date": step_date_str,
+                "matched_year": best_match_year_curr
+            })
+            
+            hist_end_dt = pd.to_datetime(best_match["end_date"])
+            try:
+                hist_mapped_dt = hist_end_dt.replace(year=step_dt.year)
+            except ValueError:
+                hist_mapped_dt = hist_end_dt.replace(year=step_dt.year, month=2, day=28)
+            drift_days = (hist_mapped_dt - step_dt).days
+            drift_days_list.append(drift_days)
                 
             adjusted_subsequent_aqi = [max(0, round(val * scaling_factor, 1)) for val in subsequent_aqi]
             
@@ -671,7 +687,15 @@ def predict_tsmart(city: str, target_date: str):
              
         narrative_notes = []
         sign = "+" if max_intensity_pct >= 0 else ""
-        narrative_notes.append(f"Intensity Adjusted: {sign}{max_intensity_pct:.1f}% vs. {best_match_year} Baseline")
+        
+        avg_drift_days = int(np.mean(drift_days_list)) if len(drift_days_list) > 0 else 0
+        drift_direction = "Early" if avg_drift_days > 0 else "Late"
+        drift_value = abs(avg_drift_days)
+        
+        years_only = [m["matched_year"] for m in matched_years_list]
+        most_common_year = max(set(years_only), key=years_only.count) if years_only else best_match_year
+        
+        narrative_notes.append(f"Intensity Adjusted: {sign}{max_intensity_pct:.1f}% vs. {most_common_year} Baseline")
         
         if has_fallback:
             narrative_notes.append("Simulated 14-day window used for late-year trajectory matching.")
@@ -721,24 +745,39 @@ def predict_tsmart(city: str, target_date: str):
                 pass
                 
         # 6. Flag "Non-Linear Spike Deviation"
+        shock_intensity = 0
         if len(sarimax_overlay) > 0 and len(timeseries) > 0:
             max_tsmart = max([t["predicted_aqi"] for t in timeseries])
             max_sarimax = max([s["sarimax_aqi"] for s in sarimax_overlay])
+            
+            if max_sarimax > 0:
+                shock_intensity = ((max_tsmart - max_sarimax) / max_sarimax) * 100
+                
             if max_tsmart > max_sarimax * 1.15:  # e.g., 15% higher intensity than SARIMAX baseline
                 narrative_notes.append("⚠️ Non-Linear Spike Deviation detected versus SARIMAX baseline.")
                 
-        insight_data["narrative_notes"] = narrative_notes
+        # Update Insight Narrative with full dynamic string requested
+        insight_data["narrative_notes"] = [
+            f"The 2026 trajectory shows a {drift_value}-day {drift_direction} Onset Drift with a {int(shock_intensity)}% Shock Intensity compared to the seasonal baseline, primarily driven by signatures matched from the high-pollution year of {most_common_year}."
+        ]
+        if has_fallback:
+            insight_data["narrative_notes"].append("Simulated 14-day window used for late-year trajectory matching.")
+            
+        insight_data["drift_velocity"] = drift_value
+        insight_data["drift_direction"] = drift_direction
+        insight_data["shock_intensity"] = int(shock_intensity)
             
         return {
             "city": city,
             "target_date": target_date,
             "intensity_adjustment": {
-                "factor": round(scaling_factor, 2),
-                "percentage": round(intensity_adjustment_pct, 1),
-                "historical_base_year": best_match["start_date"][:4]
+                "factor": round(max_scaling_factor, 2),
+                "percentage": round(max_intensity_pct, 1),
+                "historical_base_year": most_common_year
             },
             "insight_narrative": insight_data,
             "signature_comparison": signature_comparison,
+            "historical_ancestry": matched_years_list,
             "timeseries": timeseries,
             "sarimax_overlay": sarimax_overlay
         }

@@ -52,11 +52,18 @@ interface TsmartData {
         drift_summary: string;
         narrative_notes: string[];
         confidence_score: string;
+        drift_velocity: number;
+        drift_direction: string;
+        shock_intensity: number;
     };
     signature_comparison: {
         date: string;
         current_window: number;
         historical_match: number;
+    }[];
+    historical_ancestry: {
+        date: string;
+        matched_year: string;
     }[];
     timeseries: {
         date: string;
@@ -391,37 +398,110 @@ export default function ResearchPage() {
                                                 </ComposedChart>
                                             </ResponsiveContainer>
                                         </div>
+
+                                        {/* Historical Ancestry Sparkline */}
+                                        {tsmartData.historical_ancestry && (
+                                            <div className="mt-4 border-t border-white/10 pt-4">
+                                                <div className="flex h-4 w-[calc(100%-30px)] ml-auto overflow-visible rounded-sm cursor-crosshair">
+                                                    {tsmartData.historical_ancestry.map((ancestry: any, idx: number) => {
+                                                        const getYearColor = (year: string) => {
+                                                            const colors = { "2018": "#FF4C4C", "2019": "#FFD700", "2020": "#00FF94", "2021": "#00BFFF", "2022": "#FF00FF", "2023": "#FF8C00", "2024": "#8A2BE2" };
+                                                            return colors[year as keyof typeof colors] || "#ffffff50";
+                                                        }
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                className="flex-1 h-full hover:opacity-100 transition-opacity border-r border-[#050A07]/50 group relative"
+                                                                style={{ backgroundColor: getYearColor(ancestry.matched_year), opacity: 0.7 }}
+                                                            >
+                                                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-[#050A07] border border-white/20 px-3 py-1.5 rounded-md text-xs whitespace-nowrap z-50 pointer-events-none transition-opacity">
+                                                                    This window mimics the atmospheric signature of {ancestry.matched_year}
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                                <div className="flex justify-between w-[calc(100%-30px)] ml-auto mt-2 px-1">
+                                                    <div className="text-[9px] text-white/30 uppercase tracking-widest font-bold">Historical Ancestry Map</div>
+                                                    <div className="flex gap-3">
+                                                        <div className="flex items-center gap-1.5 text-[9px] text-white/50 font-mono"><span className="w-2 h-2 rounded-full bg-[#FFD700]"></span> 2019</div>
+                                                        <div className="flex items-center gap-1.5 text-[9px] text-white/50 font-mono"><span className="w-2 h-2 rounded-full bg-[#00FF94]"></span> 2020</div>
+                                                        <div className="flex items-center gap-1.5 text-[9px] text-white/50 font-mono"><span className="w-2 h-2 rounded-full bg-[#00BFFF]"></span> 2021</div>
+                                                        <div className="flex items-center gap-1.5 text-[9px] text-white/50 font-mono"><span className="w-2 h-2 rounded-full bg-[#8A2BE2]"></span> 2024</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Pattern Match & Insight Row */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
-                                        {/* Signature Match Mini-Chart */}
-                                        <div className="glass-panel p-6 rounded-2xl border border-white/10 relative overflow-hidden">
+                                        {/* Transparency Parameters */}
+                                        <div className="glass-panel p-6 rounded-2xl border border-white/10 relative overflow-hidden flex flex-col justify-between">
                                             <div className="absolute top-0 right-0 w-32 h-32 bg-[#00FF94]/5 rounded-bl-full -z-10 blur-2xl"></div>
 
-                                            <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
-                                                <Activity size={18} className="text-[#00FF94]" /> Signature Match
-                                            </h3>
-                                            <p className="text-xs text-white/50 mb-6">Comparing current 14-day context window against {tsmartData.intensity_adjustment.historical_base_year} historical match.</p>
+                                            <div>
+                                                <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
+                                                    <Activity size={18} className="text-[#00FF94]" /> Adaptive Parameters
+                                                </h3>
+                                                <p className="text-xs text-white/50 mb-6">Real-time vector alignment metrics for the 365-day trajectory.</p>
+                                            </div>
 
-                                            <div className="h-[200px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={tsmartData.signature_comparison} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                                                        <XAxis
-                                                            dataKey="date"
-                                                            stroke="#ffffff30"
-                                                            tick={{ fontSize: 10 }}
-                                                            tickFormatter={(v) => new Date(v).getDate().toString()}
-                                                        />
-                                                        <YAxis stroke="#ffffff30" tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
-                                                        <RechartsTooltip contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }} />
+                                            <div className="space-y-8">
+                                                {/* Drift Velocity Radar */}
+                                                <div>
+                                                    <div className="flex justify-between items-end mb-3">
+                                                        <span className="text-xs text-white/50 font-bold uppercase tracking-widest">Temporal Drift</span>
+                                                        <span className="text-lg font-mono text-white/90 font-bold">
+                                                            {tsmartData.insight_narrative.drift_velocity}d <span className="text-[#00FF94] text-xs uppercase ml-1">{tsmartData.insight_narrative.drift_direction}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="relative w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                                                        <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-white/20 z-10 -translate-x-1/2"></div>
+                                                        {tsmartData.insight_narrative.drift_direction === "Early" ? (
+                                                            <div className="absolute top-0 bottom-0 right-1/2 bg-gradient-to-l from-[#00FF94] to-[#00FF94]/20 rounded-l-full" style={{ width: `${Math.min(50, (tsmartData.insight_narrative.drift_velocity / 30) * 50)}%` }}></div>
+                                                        ) : (
+                                                            <div className="absolute top-0 bottom-0 left-1/2 bg-gradient-to-r from-[#FF8C00] to-[#FF8C00]/20 rounded-r-full" style={{ width: `${Math.min(50, (tsmartData.insight_narrative.drift_velocity / 30) * 50)}%` }}></div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex justify-between mt-2 px-1">
+                                                        <span className="text-[9px] text-white/30 uppercase font-bold tracking-widest">Early Onset</span>
+                                                        <span className="text-[9px] text-white/30 uppercase font-bold tracking-widest">Late Onset</span>
+                                                    </div>
+                                                </div>
 
-                                                        <Line type="monotone" name="Historical Target" dataKey="historical_match" stroke="#ffffff40" strokeDasharray="4 4" dot={false} />
-                                                        <Line type="monotone" name="Current Context" dataKey="current_window" stroke="#00FF94" strokeWidth={2} dot={{ r: 3, fill: '#050A07', stroke: '#00FF94', strokeWidth: 2 }} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
+                                                {/* Shock Intensity Meter */}
+                                                <div>
+                                                    <div className="flex justify-between items-end mb-3">
+                                                        <span className="text-xs text-white/50 font-bold uppercase tracking-widest">Shock Intensity</span>
+                                                        <span className={`text-lg font-mono font-bold ${tsmartData.insight_narrative.shock_intensity > 20 ? "text-[#FF4C4C]" : "text-white/90"}`}>
+                                                            +{tsmartData.insight_narrative.shock_intensity}%
+                                                            {tsmartData.insight_narrative.shock_intensity > 20 && <span className="ml-2 text-[10px] uppercase tracking-widest bg-[#FF4C4C]/20 border border-[#FF4C4C]/50 px-2 py-1 rounded-md text-[#FF4C4C] relative -top-0.5">High Surge</span>}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex gap-1 h-3 w-full">
+                                                        {[10, 20, 30, 40, 50].map((threshold) => {
+                                                            const isActive = tsmartData.insight_narrative.shock_intensity >= threshold;
+                                                            const isHighSurge = threshold > 20;
+                                                            let bgColor = "bg-white/5";
+                                                            if (isActive) {
+                                                                bgColor = isHighSurge ? "bg-gradient-to-b from-[#FF4C4C] to-[#990000]" : "bg-gradient-to-b from-[#00FF94] to-[#006633]";
+                                                            }
+                                                            return (
+                                                                <div
+                                                                    key={threshold}
+                                                                    className={`flex-1 rounded-sm transition-all duration-500 ease-out ${bgColor}`}
+                                                                    style={{ opacity: isActive ? 1 : 0.5, boxShadow: isActive && isHighSurge ? '0 0 10px rgba(255, 76, 76, 0.4)' : 'none' }}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="flex justify-between mt-2 px-1">
+                                                        <span className="text-[9px] text-white/30 uppercase font-bold tracking-widest">Nominal</span>
+                                                        <span className="text-[9px] text-white/30 uppercase font-bold tracking-widest">Severe</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
