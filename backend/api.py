@@ -715,7 +715,10 @@ def predict_tsmart(city: str, target_date: str):
                 s_forecast = s_model.get_forecast(steps=sarimax_steps, exog=proxy_exog)
                 
                 # Extract raw numpy array
-                s_mean_array = s_forecast.predicted_mean.values
+                if hasattr(s_forecast.predicted_mean, 'values'):
+                    s_mean_array = s_forecast.predicted_mean.values
+                else:
+                    s_mean_array = s_forecast.predicted_mean
                 proxy_dates = pd.to_datetime(proxy_exog.index)
                 
                 # Read metadata for potential log inverse
