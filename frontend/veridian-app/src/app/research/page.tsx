@@ -118,7 +118,7 @@ export default function ResearchPage() {
     const fetchSarimaxData = async (city: string) => {
         setIsLoading(true);
         try {
-            const res = await fetch(`http://localhost:8000/predict/sarimax?city=${city}&target_date=${TARGET_DATE}`, {
+            const res = await fetch(`http://localhost:8001/predict/sarimax?city=${city}&target_date=${TARGET_DATE}`, {
                 method: "POST"
             });
             if (res.ok) {

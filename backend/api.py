@@ -83,6 +83,11 @@ WAQI_TOKEN = "a87c8e2b990acd88caab2eb206b5f1f4467e228c"
 def home():
     return {"status": "Veridian ML API is running"}
 
+@app.get("/test-verify")
+def test_verify():
+    return {"message": "I am the new api.py!"}
+
+
 @app.get("/current")
 def get_current_data(city: str):
     waqi_url = f"https://api.waqi.info/feed/{city}/?token={WAQI_TOKEN}"
@@ -953,6 +958,8 @@ def predict_sarimax(city: str, target_date: str):
             dynamic_narrative = f"Model Insight: For the selected date, the forecast is primarily driven by {top_driver} ({drivers[top_driver]}% influence). Reliability is {rel_text}, as the Confidence Pulse remains in the {rel_zone} Zone (Width: {last_day_pulse})."
         else:
             dynamic_narrative = "Model Insight: Insufficient data to generate dynamic narrative."
+        
+        print(f"DEBUG: Returning timeseries length={len(timeseries)}, driver_dominance length={len(driver_dominance)}, narrative={dynamic_narrative}")
         
         return {
             "model_name": "SARIMAX (1,1,1)x(1,1,1,12)",
