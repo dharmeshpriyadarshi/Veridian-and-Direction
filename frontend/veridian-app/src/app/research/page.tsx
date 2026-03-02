@@ -15,6 +15,7 @@ interface ForecastPoint {
     lower_bound: number;
     upper_bound: number;
     pulse_width: number;
+    pulse_pct: number;
 }
 
 interface CausalityWeights {
@@ -638,8 +639,10 @@ export default function ResearchPage() {
                                             </div>
                                             <div className="flex w-full h-3 overflow-visible rounded-sm bg-white/5 relative">
                                                 {sarimaxData.timeseries.map((pt, i) => {
-                                                    // Heatmap logic: narrow pulse (green) to wide pulse (red)
-                                                    const hue = Math.max(0, 120 - (pt.pulse_width / 2.5)); // Drops from 120 (Green) to 0 (Red)
+                                                    // Relative heatmap: pulse_pct is CI width as % of predicted AQI
+                                                    // <50% = green (120), ~80% = yellow (60), >100% = red (0)
+                                                    const pulsePct = pt.pulse_pct || 0;
+                                                    const hue = Math.max(0, Math.min(120, 120 - (pulsePct - 40) * 2));
                                                     return (
                                                         <div
                                                             key={i}
@@ -647,7 +650,7 @@ export default function ResearchPage() {
                                                             style={{ backgroundColor: `hsl(${hue}, 100%, 50%)` }}
                                                         >
                                                             <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/pip:opacity-100 bg-[#050A07] border border-white/20 px-2 py-1 rounded text-[10px] whitespace-nowrap z-50 pointer-events-none transition-opacity font-mono">
-                                                                {pt.date}: {pt.pulse_width}
+                                                                {pt.date} | CI: ±{(pt.pulse_width / 2).toFixed(0)} AQI ({pulsePct}%)
                                                             </div>
                                                         </div>
                                                     )

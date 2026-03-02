@@ -83,10 +83,6 @@ WAQI_TOKEN = "a87c8e2b990acd88caab2eb206b5f1f4467e228c"
 def home():
     return {"status": "Veridian ML API is running"}
 
-@app.get("/test-verify")
-def test_verify():
-    return {"message": "I am the new api.py!"}
-
 
 @app.get("/current")
 def get_current_data(city: str):
@@ -874,10 +870,13 @@ def predict_sarimax(city: str, target_date: str):
             param_dict = params
             
         # Safe extraction of exogenous weights
+        # statsmodels names exog params as x1, x2, x3 (positional) when columns
+        # are passed as a DataFrame. Map them to the known column order:
+        # x1 = Wind_Speed, x2 = Temperature, x3 = Humidity
         exo_weights = {
-            "Wind_Speed": round(float(param_dict.get("Wind_Speed", param_dict.get("exog.Wind_Speed", 0.0))), 4),
-            "Temperature": round(float(param_dict.get("Temperature", param_dict.get("exog.Temperature", 0.0))), 4),
-            "Humidity": round(float(param_dict.get("Humidity", param_dict.get("exog.Humidity", 0.0))), 4)
+            "Wind_Speed": round(float(param_dict.get("x1", param_dict.get("Wind_Speed", param_dict.get("exog.Wind_Speed", 0.0)))), 4),
+            "Temperature": round(float(param_dict.get("x2", param_dict.get("Temperature", param_dict.get("exog.Temperature", 0.0)))), 4),
+            "Humidity": round(float(param_dict.get("x3", param_dict.get("Humidity", param_dict.get("exog.Humidity", 0.0)))), 4)
         }
         
         # Safe extraction of AR(1) "System Memory" weight
@@ -907,12 +906,14 @@ def predict_sarimax(city: str, target_date: str):
             up_bound = max(0.0, round(float(up_val), 1))
             pulse_width = round(up_bound - low_bound, 1)
                 
+            pulse_pct = round((pulse_width / pred_val_bounded) * 100, 1) if pred_val_bounded > 0 else 0.0
             timeseries.append({
                 "date": dt.strftime('%Y-%m-%d'),
                 "predicted_aqi": pred_val_bounded,
                 "lower_bound": low_bound,
                 "upper_bound": up_bound,
-                "pulse_width": pulse_width
+                "pulse_width": pulse_width,
+                "pulse_pct": pulse_pct
             })
             
             # Driver Dominance Calculation
@@ -951,15 +952,24 @@ def predict_sarimax(city: str, target_date: str):
             }
             top_driver = max(drivers, key=drivers.get)
             
-            # Assuming a pulse width > 150 is "Wide" (high uncertainty) for AQI
-            rel_zone = "Red" if last_day_pulse > 150 else "Green"
-            rel_text = "low" if last_day_pulse > 150 else "high"
+            # Relative confidence: CI width as % of predicted AQI
+            last_pred = timeseries[-1]["predicted_aqi"]
+            rel_width_pct = round((last_day_pulse / last_pred) * 100, 1) if last_pred > 0 else 100.0
             
-            dynamic_narrative = f"Model Insight: For the selected date, the forecast is primarily driven by {top_driver} ({drivers[top_driver]}% influence). Reliability is {rel_text}, as the Confidence Pulse remains in the {rel_zone} Zone (Width: {last_day_pulse})."
+            if rel_width_pct < 50:
+                rel_zone = "Green"
+                rel_text = "high"
+            elif rel_width_pct < 80:
+                rel_zone = "Amber"
+                rel_text = "moderate"
+            else:
+                rel_zone = "Red"
+                rel_text = "low"
+            
+            dynamic_narrative = f"Model Insight: For the selected date, the forecast is primarily driven by {top_driver} ({drivers[top_driver]}% influence). Reliability is {rel_text}, as the Confidence Pulse remains in the {rel_zone} Zone (CI Width: {rel_width_pct}% of predicted AQI)."
         else:
             dynamic_narrative = "Model Insight: Insufficient data to generate dynamic narrative."
         
-        print(f"DEBUG: Returning timeseries length={len(timeseries)}, driver_dominance length={len(driver_dominance)}, narrative={dynamic_narrative}")
         
         return {
             "model_name": "SARIMAX (1,1,1)x(1,1,1,12)",
