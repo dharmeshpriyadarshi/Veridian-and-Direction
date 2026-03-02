@@ -399,7 +399,8 @@ export default function ResearchPage() {
                                             </ResponsiveContainer>
                                         </div>
 
-                                        {/* Historical Ancestry Sparkline */}
+                                        {/* Historical Ancestry Sparkline (Temporarily Hidden to match theme) */}
+                                        {/* 
                                         {tsmartData.historical_ancestry && (
                                             <div className="mt-4 border-t border-white/10 pt-4">
                                                 <div className="flex h-4 w-[calc(100%-30px)] ml-auto overflow-visible rounded-sm cursor-crosshair">
@@ -432,6 +433,7 @@ export default function ResearchPage() {
                                                 </div>
                                             </div>
                                         )}
+                                        */}
                                     </div>
 
                                     {/* Pattern Match & Insight Row */}
@@ -450,13 +452,15 @@ export default function ResearchPage() {
 
                                             <div className="space-y-8">
                                                 {/* Drift Velocity Radar */}
-                                                <div>
-                                                    <div className="flex justify-between items-end mb-3">
+                                                <div className="group relative">
+                                                    <div className="flex justify-between items-end mb-1">
                                                         <span className="text-xs text-white/50 font-bold uppercase tracking-widest">Temporal Drift</span>
                                                         <span className="text-lg font-mono text-white/90 font-bold">
                                                             {tsmartData.insight_narrative.drift_velocity}d <span className="text-[#00FF94] text-xs uppercase ml-1">{tsmartData.insight_narrative.drift_direction}</span>
                                                         </span>
                                                     </div>
+                                                    <p className="text-[10px] text-white/40 mb-3 leading-snug pr-8">Tracks whether the projected pollution trajectory is arriving earlier or later than the historical seasonal baseline.</p>
+
                                                     <div className="relative w-full h-2 bg-white/5 rounded-full overflow-hidden">
                                                         <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-white/20 z-10 -translate-x-1/2"></div>
                                                         {tsmartData.insight_narrative.drift_direction === "Early" ? (
@@ -473,13 +477,14 @@ export default function ResearchPage() {
 
                                                 {/* Shock Intensity Meter */}
                                                 <div>
-                                                    <div className="flex justify-between items-end mb-3">
+                                                    <div className="flex justify-between items-end mb-1">
                                                         <span className="text-xs text-white/50 font-bold uppercase tracking-widest">Shock Intensity</span>
                                                         <span className={`text-lg font-mono font-bold ${tsmartData.insight_narrative.shock_intensity > 20 ? "text-[#FF4C4C]" : "text-white/90"}`}>
                                                             +{tsmartData.insight_narrative.shock_intensity}%
                                                             {tsmartData.insight_narrative.shock_intensity > 20 && <span className="ml-2 text-[10px] uppercase tracking-widest bg-[#FF4C4C]/20 border border-[#FF4C4C]/50 px-2 py-1 rounded-md text-[#FF4C4C] relative -top-0.5">High Surge</span>}
                                                         </span>
                                                     </div>
+                                                    <p className="text-[10px] text-white/40 mb-3 leading-snug pr-8">Calculates the percentage by which the T-SMART adaptive peak exceeds the expected SARIMAX seasonal baseline.</p>
                                                     <div className="flex gap-1 h-3 w-full">
                                                         {[10, 20, 30, 40, 50].map((threshold) => {
                                                             const isActive = tsmartData.insight_narrative.shock_intensity >= threshold;
@@ -508,9 +513,10 @@ export default function ResearchPage() {
                                         {/* Insight Engine Card */}
                                         <div className="glass-panel p-6 rounded-2xl border border-white/10 flex flex-col justify-between">
                                             <div>
-                                                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                                                <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
                                                     <Brain size={18} className="text-[#00FF94]" /> Deep Observation
                                                 </h3>
+                                                <p className="text-xs text-white/50 mb-6">AI-synthesized narrative analyzing the interaction between Temporal Drift, Shock Intensity, and Historical Ancestry to explain the 2026 prediction.</p>
                                                 <div className="mb-4">
                                                     <h4 className="text-[#00FF94] font-semibold text-lg">{tsmartData.insight_narrative.trajectory_name}</h4>
                                                     <p className="text-sm text-white/80 leading-relaxed mt-2">{tsmartData.insight_narrative.drift_summary}</p>
