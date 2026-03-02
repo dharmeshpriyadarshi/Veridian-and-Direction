@@ -14,6 +14,7 @@ interface ForecastPoint {
     predicted_aqi: number;
     lower_bound: number;
     upper_bound: number;
+    pulse_width: number;
 }
 
 interface CausalityWeights {
@@ -26,12 +27,22 @@ interface CausalityWeights {
     note: string;
 }
 
+interface DriverDominance {
+    date: string;
+    wind_pct: number;
+    temp_pct: number;
+    humid_pct: number;
+    ar_pct: number;
+}
+
 interface SarimaxData {
     model_name: string;
     city: string;
     target_date: string;
     timeseries: ForecastPoint[];
     causality_weights: CausalityWeights;
+    causality_narrative: string;
+    driver_dominance: DriverDominance[];
     metrics_on_test_set: {
         rmse: number;
         mae: number;
@@ -163,33 +174,21 @@ export default function ResearchPage() {
         });
     };
 
-    // Data Transformation for the Bar Chart
-    const formatCausalityData = () => {
-        if (!sarimaxData) return [];
-        const w = sarimaxData.causality_weights.exogenous;
-        return [
-            { name: "Wind Speed", weight: w.Wind_Speed, raw: Math.abs(w.Wind_Speed) },
-            { name: "Temperature", weight: w.Temperature, raw: Math.abs(w.Temperature) },
-            { name: "Humidity", weight: w.Humidity, raw: Math.abs(w.Humidity) }
-        ].sort((a, b) => b.raw - a.raw); // Sort by absolute magnitude
-    };
-
-    // Calculate dynamic narrative
-    const generateNarrative = () => {
-        if (!sarimaxData) return "";
-        const w = sarimaxData.causality_weights.exogenous;
-        const absWeights = [
-            { name: "Wind Speed", val: Math.abs(w.Wind_Speed), real: w.Wind_Speed },
-            { name: "Temperature", val: Math.abs(w.Temperature), real: w.Temperature },
-            { name: "Humidity", val: Math.abs(w.Humidity), real: w.Humidity }
-        ];
-        absWeights.sort((a, b) => b.val - a.val);
-        const topDriver = absWeights[0];
-
-        let direction = topDriver.real < 0 ? "dispersing" : "trapping";
-        if (topDriver.name === "Temperature" && topDriver.real > 0) direction = "exacerbating";
-
-        return `High Transparency: For ${sarimaxData.city}, ${topDriver.name} is the dominant weather driver ${direction} pollution spikes (Weight: ${topDriver.real}).`;
+    // Custom Tooltip for Dominance Chart
+    const DominanceTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-[#050A07] border border-white/20 p-3 rounded-lg shadow-xl whitespace-nowrap z-50">
+                    <p className="text-[#00FF94] font-bold text-sm mb-2">{label}</p>
+                    {payload.map((entry: any, index: number) => (
+                        <p key={`item-${index}`} className="text-xs" style={{ color: entry.color }}>
+                            {entry.name}: <span className="font-mono font-bold">{entry.value}%</span>
+                        </p>
+                    ))}
+                </div>
+            );
+        }
+        return null;
     };
 
 
@@ -630,39 +629,63 @@ export default function ResearchPage() {
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
+
+                                        {/* Confidence Pulse Visual Strip */}
+                                        <div className="mt-4 pt-4 border-t border-white/10 group cursor-crosshair">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold">Confidence Pulse</span>
+                                                <span className="text-[10px] text-white/50 uppercase tracking-widest">95% CI Boundary Width</span>
+                                            </div>
+                                            <div className="flex w-full h-3 overflow-visible rounded-sm bg-white/5 relative">
+                                                {sarimaxData.timeseries.map((pt, i) => {
+                                                    // Heatmap logic: narrow pulse (green) to wide pulse (red)
+                                                    const hue = Math.max(0, 120 - (pt.pulse_width / 2.5)); // Drops from 120 (Green) to 0 (Red)
+                                                    return (
+                                                        <div
+                                                            key={i}
+                                                            className="flex-1 h-full hover:opacity-100 opacity-80 transition-opacity relative group/pip"
+                                                            style={{ backgroundColor: `hsl(${hue}, 100%, 50%)` }}
+                                                        >
+                                                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/pip:opacity-100 bg-[#050A07] border border-white/20 px-2 py-1 rounded text-[10px] whitespace-nowrap z-50 pointer-events-none transition-opacity font-mono">
+                                                                {pt.date}: {pt.pulse_width}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
                                     </div>
 
                                     {/* Transparency & Causality Row */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                                        {/* Exogenous Feature Weights */}
-                                        <div className="glass-panel p-6 rounded-2xl border border-white/10">
-                                            <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
-                                                <Cpu size={18} className="text-[#00FF94]" /> Feature Significance
-                                            </h3>
-                                            <p className="text-xs text-white/40 mb-6">{sarimaxData.causality_weights.note}</p>
+                                        {/* Dynamic Driver Dominance Streamgraph */}
+                                        <div className="glass-panel p-6 rounded-2xl border border-white/10 flex flex-col justify-between">
+                                            <div>
+                                                <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
+                                                    <Cpu size={18} className="text-[#00FF94]" /> Driver Dominance
+                                                </h3>
+                                                <p className="text-xs text-white/40 mb-4">Daily percentage contribution of weather vs. system memory.</p>
 
-                                            <div className="h-[180px] w-full mb-4">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={formatCausalityData()} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={true} vertical={false} />
-                                                        <XAxis type="number" stroke="#ffffff50" tick={{ fontSize: 10 }} />
-                                                        <YAxis dataKey="name" type="category" stroke="#ffffff50" tick={{ fontSize: 12, fill: '#fff' }} width={80} />
-                                                        <Tooltip
-                                                            cursor={{ fill: '#ffffff05' }}
-                                                            contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }}
-                                                        />
-                                                        <Bar dataKey="weight" radius={[0, 4, 4, 0]}>
-                                                            {formatCausalityData().map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={entry.weight < 0 ? '#4ade80' : '#ef4444'} />
-                                                            ))}
-                                                        </Bar>
-                                                    </BarChart>
-                                                </ResponsiveContainer>
+                                                <div className="h-[180px] w-full mb-4">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <AreaChart data={sarimaxData.driver_dominance} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                                                            <XAxis dataKey="date" hide={true} />
+                                                            <YAxis hide={true} domain={[0, 100]} />
+                                                            <Tooltip content={<DominanceTooltip />} />
+                                                            <Area type="monotone" dataKey="wind_pct" stackId="1" stroke="none" fill="#00BFFF" name="Wind" />
+                                                            <Area type="monotone" dataKey="temp_pct" stackId="1" stroke="none" fill="#FFBF00" name="Temperature" />
+                                                            <Area type="monotone" dataKey="humid_pct" stackId="1" stroke="none" fill="#4169E1" name="Humidity" />
+                                                            <Area type="monotone" dataKey="ar_pct" stackId="1" stroke="none" fill="#8A2BE2" name="AR Memory" />
+                                                        </AreaChart>
+                                                    </ResponsiveContainer>
+                                                </div>
                                             </div>
 
-                                            <div className="bg-[#00FF94]/10 border border-[#00FF94]/20 p-3 rounded-xl text-sm leading-relaxed text-[#00FF94]">
-                                                {generateNarrative()}
+                                            <div className="bg-[#00FF94]/5 border border-[#00FF94]/20 p-4 rounded-xl text-xs leading-relaxed text-[#00FF94] flex gap-3">
+                                                <div className="w-2 h-2 rounded-full bg-[#00FF94] shrink-0 mt-1" />
+                                                {sarimaxData.causality_narrative}
                                             </div>
                                         </div>
 

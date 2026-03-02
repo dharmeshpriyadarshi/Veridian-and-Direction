@@ -880,6 +880,8 @@ def predict_sarimax(city: str, target_date: str):
         
         # 7. Build Continuous Timeseries Array
         timeseries = []
+        driver_dominance = []
+        
         for i, dt in enumerate(proxy_exog.index):
             pred_val = predicted_mean.iloc[i] if isinstance(predicted_mean, pd.Series) else predicted_mean[i]
             if isinstance(conf_int, pd.DataFrame):
@@ -889,17 +891,68 @@ def predict_sarimax(city: str, target_date: str):
                 low_val = conf_int[i, 0]
                 up_val = conf_int[i, 1]
                 
+            # Inverse transform
             if is_log_transformed:
                 pred_val = np.expm1(pred_val)
                 low_val = np.expm1(low_val)
                 up_val = np.expm1(up_val)
                 
+            pred_val_bounded = max(0.0, round(float(pred_val), 1))
+            low_bound = max(0.0, round(float(low_val), 1))
+            up_bound = max(0.0, round(float(up_val), 1))
+            pulse_width = round(up_bound - low_bound, 1)
+                
             timeseries.append({
                 "date": dt.strftime('%Y-%m-%d'),
-                "predicted_aqi": max(0.0, round(float(pred_val), 1)),
-                "lower_bound": max(0.0, round(float(low_val), 1)),
-                "upper_bound": max(0.0, round(float(up_val), 1))
+                "predicted_aqi": pred_val_bounded,
+                "lower_bound": low_bound,
+                "upper_bound": up_bound,
+                "pulse_width": pulse_width
             })
+            
+            # Driver Dominance Calculation
+            w_wind = abs(exo_weights["Wind_Speed"] * float(proxy_exog.iloc[i]["Wind_Speed"]))
+            w_temp = abs(exo_weights["Temperature"] * float(proxy_exog.iloc[i]["Temperature"]))
+            w_humid = abs(exo_weights["Humidity"] * float(proxy_exog.iloc[i]["Humidity"]))
+            w_ar = abs(ar_weight) # Static proxy for system memory weight
+            
+            total_impact = w_wind + w_temp + w_humid + w_ar
+            if total_impact > 0:
+                wind_pct = round((w_wind / total_impact) * 100, 1)
+                temp_pct = round((w_temp / total_impact) * 100, 1)
+                humid_pct = round((w_humid / total_impact) * 100, 1)
+                ar_pct = round((w_ar / total_impact) * 100, 1)
+            else:
+                wind_pct, temp_pct, humid_pct, ar_pct = 0,0,0,0
+                
+            driver_dominance.append({
+                "date": dt.strftime('%Y-%m-%d'),
+                "wind_pct": wind_pct,
+                "temp_pct": temp_pct,
+                "humid_pct": humid_pct,
+                "ar_pct": ar_pct
+            })
+            
+        # 8. Dynamic Narrative Update
+        if len(driver_dominance) > 0:
+            last_day_dom = driver_dominance[-1]
+            last_day_pulse = timeseries[-1]["pulse_width"]
+            
+            drivers = {
+                "Wind Speed": last_day_dom["wind_pct"],
+                "Temperature": last_day_dom["temp_pct"],
+                "Humidity": last_day_dom["humid_pct"],
+                "System Memory": last_day_dom["ar_pct"]
+            }
+            top_driver = max(drivers, key=drivers.get)
+            
+            # Assuming a pulse width > 150 is "Wide" (high uncertainty) for AQI
+            rel_zone = "Red" if last_day_pulse > 150 else "Green"
+            rel_text = "low" if last_day_pulse > 150 else "high"
+            
+            dynamic_narrative = f"Model Insight: For the selected date, the forecast is primarily driven by {top_driver} ({drivers[top_driver]}% influence). Reliability is {rel_text}, as the Confidence Pulse remains in the {rel_zone} Zone (Width: {last_day_pulse})."
+        else:
+            dynamic_narrative = "Model Insight: Insufficient data to generate dynamic narrative."
         
         return {
             "model_name": "SARIMAX (1,1,1)x(1,1,1,12)",
@@ -911,11 +964,13 @@ def predict_sarimax(city: str, target_date: str):
             "horizon_days": steps,
             "log_transformed_in_training": is_log_transformed,
             "metrics_on_test_set": city_meta.get("metrics", {}),
+            "causality_narrative": dynamic_narrative,
             "causality_weights": {
                 "exogenous": exo_weights,
                 "system_memory": ar_weight,
                 "note": "Relative Impact Weights (Exogenous features were standardized)"
             },
+            "driver_dominance": driver_dominance,
             "timeseries": timeseries
         }
 
