@@ -993,3 +993,23 @@ def predict_sarimax(city: str, target_date: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# NEW: MODEL 4 XGBOOST PERFORMANCE ENDPOINT
+# =====================================================
+@app.get("/model/xgboost/performance")
+def get_xgboost_performance():
+    """
+    Returns XGBoost per-city metrics, top-10 feature importances,
+    and the SARIMAX vs XGBoost comparison matrix.
+    """
+    perf_path = os.path.join(ROOT_DIR, "data", "diagnostics", "xgboost_performance.json")
+    if not os.path.exists(perf_path):
+        raise HTTPException(status_code=404, detail="XGBoost performance data not found. Run train_xgboost.py first.")
+    
+    try:
+        with open(perf_path, "r") as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

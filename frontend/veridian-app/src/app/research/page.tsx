@@ -3,7 +3,7 @@
 import Navbar from "@/components/Navbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Lock, Search, Filter, Cpu, Brain, Activity, Download, ChevronRight, Wind, Thermometer, Droplets } from "lucide-react";
+import { Lock, Search, Filter, Cpu, Brain, Activity, Download, ChevronRight, Wind, Thermometer, Droplets, TreePine } from "lucide-react";
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart, ComposedChart,
     BarChart, Bar, Cell, Tooltip
@@ -87,6 +87,29 @@ interface TsmartData {
     }[];
 }
 
+interface XGBoostCityMetrics {
+    training_range: string;
+    testing_range: string;
+    best_iteration: number;
+    metrics: { rmse: number; mape: number };
+    top_10_features: { feature: string; importance: number }[];
+}
+
+interface ComparisonEntry {
+    sarimax_rmse: number | null;
+    sarimax_mape: number | null;
+    xgboost_rmse: number;
+    xgboost_mape: number;
+    winner_rmse: string;
+    winner_mape: string;
+}
+
+interface XGBoostData {
+    model: string;
+    cities: Record<string, XGBoostCityMetrics>;
+    comparison_matrix: Record<string, ComparisonEntry>;
+}
+
 const CITIES = ["Delhi", "Mumbai", "Kolkata", "Chennai", "Bangalore"];
 const TARGET_DATE = "2026-12-31"; // Default forecast horizon for the dashboard
 
@@ -98,9 +121,10 @@ export default function ResearchPage() {
 
     // Dashboard State
     const [selectedCity, setSelectedCity] = useState("Delhi");
-    const [activeModel, setActiveModel] = useState<"SARIMAX" | "T-SMART">("SARIMAX");
+    const [activeModel, setActiveModel] = useState<"SARIMAX" | "T-SMART" | "XGBOOST">("SARIMAX");
     const [sarimaxData, setSarimaxData] = useState<SarimaxData | null>(null);
     const [tsmartData, setTsmartData] = useState<TsmartData | null>(null);
+    const [xgboostData, setXgboostData] = useState<XGBoostData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     // T-SMART Features
@@ -150,12 +174,29 @@ export default function ResearchPage() {
         }
     };
 
+    const fetchXgboostData = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`http://localhost:8001/model/xgboost/performance`);
+            if (res.ok) {
+                const data = await res.json();
+                setXgboostData(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch XGBoost data:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (isLoggedIn) {
             if (activeModel === "SARIMAX") {
                 fetchSarimaxData(selectedCity);
             } else if (activeModel === "T-SMART") {
                 fetchTsmartData(selectedCity);
+            } else if (activeModel === "XGBOOST") {
+                fetchXgboostData();
             }
         }
     }, [isLoggedIn, selectedCity, activeModel]);
@@ -266,6 +307,12 @@ export default function ResearchPage() {
                             className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeModel === "T-SMART" ? "bg-[#00FF94] text-black shadow-[0_0_15px_rgba(0,255,148,0.3)]" : "text-white/50 hover:text-white"}`}
                         >
                             <Brain size={16} /> Model 2: T-SMART
+                        </button>
+                        <button
+                            onClick={() => setActiveModel("XGBOOST")}
+                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeModel === "XGBOOST" ? "bg-[#00FF94] text-black shadow-[0_0_15px_rgba(0,255,148,0.3)]" : "text-white/50 hover:text-white"}`}
+                        >
+                            <TreePine size={16} /> Model 4: XGBoost
                         </button>
                     </div>
                 </div>
@@ -729,6 +776,179 @@ export default function ResearchPage() {
                                 <div className="w-full h-[400px] glass-panel rounded-2xl border border-[#ef4444]/20 flex flex-col items-center justify-center p-12 text-center bg-[#ef4444]/5">
                                     <h2 className="text-2xl font-bold mb-3 text-[#ef4444]">Failed to load model data</h2>
                                     <p className="text-white/60">The backend API is unreachable or returned an error.</p>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* XGBOOST FULL VIEW */}
+                    {activeModel === "XGBOOST" && (
+                        <>
+                            {isLoading ? (
+                                <div className="w-full h-[400px] glass-panel rounded-2xl border border-white/10 flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF94]"></div>
+                                </div>
+                            ) : xgboostData ? (
+                                <>
+                                    {/* Comparison Matrix */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div>
+                                                <h2 className="text-xl font-bold">Performance Comparison Matrix</h2>
+                                                <p className="text-sm text-white/50">SARIMAX vs XGBoost — Out-of-Sample Test (2023-2024)</p>
+                                            </div>
+                                            <div className="px-3 py-1.5 bg-[#00FF94]/10 border border-[#00FF94]/30 rounded-lg">
+                                                <span className="text-[#00FF94] text-xs font-bold uppercase tracking-widest">5 Cities</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b border-white/10">
+                                                        <th className="text-left py-3 px-4 text-white/50 uppercase tracking-wider text-xs">City</th>
+                                                        <th className="text-center py-3 px-4 text-white/50 uppercase tracking-wider text-xs">SARIMAX RMSE</th>
+                                                        <th className="text-center py-3 px-4 text-white/50 uppercase tracking-wider text-xs">XGBoost RMSE</th>
+                                                        <th className="text-center py-3 px-4 text-white/50 uppercase tracking-wider text-xs">RMSE Winner</th>
+                                                        <th className="text-center py-3 px-4 text-white/50 uppercase tracking-wider text-xs">SARIMAX MAPE</th>
+                                                        <th className="text-center py-3 px-4 text-white/50 uppercase tracking-wider text-xs">XGBoost MAPE</th>
+                                                        <th className="text-center py-3 px-4 text-white/50 uppercase tracking-wider text-xs">MAPE Winner</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {Object.entries(xgboostData.comparison_matrix).map(([city, comp]) => (
+                                                        <tr key={city} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                            <td className="py-3 px-4 font-semibold text-white">{city}</td>
+                                                            <td className={`py-3 px-4 text-center font-mono ${comp.winner_rmse === 'SARIMAX' ? 'text-[#00FF94] font-bold' : 'text-white/60'}`}>
+                                                                {comp.sarimax_rmse?.toFixed(2) ?? 'N/A'}
+                                                            </td>
+                                                            <td className={`py-3 px-4 text-center font-mono ${comp.winner_rmse === 'XGBoost' ? 'text-[#00FF94] font-bold' : 'text-white/60'}`}>
+                                                                {comp.xgboost_rmse.toFixed(2)}
+                                                            </td>
+                                                            <td className="py-3 px-4 text-center">
+                                                                <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${comp.winner_rmse === 'XGBoost' ? 'bg-[#00BFFF]/15 text-[#00BFFF] border border-[#00BFFF]/30' : 'bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30'}`}>
+                                                                    {comp.winner_rmse}
+                                                                </span>
+                                                            </td>
+                                                            <td className={`py-3 px-4 text-center font-mono ${comp.winner_mape === 'SARIMAX' ? 'text-[#00FF94] font-bold' : 'text-white/60'}`}>
+                                                                {comp.sarimax_mape?.toFixed(2) ?? 'N/A'}%
+                                                            </td>
+                                                            <td className={`py-3 px-4 text-center font-mono ${comp.winner_mape === 'XGBoost' ? 'text-[#00FF94] font-bold' : 'text-white/60'}`}>
+                                                                {comp.xgboost_mape.toFixed(2)}%
+                                                            </td>
+                                                            <td className="py-3 px-4 text-center">
+                                                                <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${comp.winner_mape === 'XGBoost' ? 'bg-[#00BFFF]/15 text-[#00BFFF] border border-[#00BFFF]/30' : 'bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30'}`}>
+                                                                    {comp.winner_mape}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* Feature Importance + City Metrics */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                        {/* Feature Importance Chart */}
+                                        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+                                            <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
+                                                <TreePine size={18} className="text-[#00FF94]" /> Feature Importance
+                                            </h3>
+                                            <p className="text-xs text-white/50 mb-6">Top 10 features for {selectedCity} (XGBoost gain-based split importance)</p>
+
+                                            {xgboostData.cities[selectedCity] ? (
+                                                <div className="h-[350px] w-full">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <BarChart
+                                                            data={xgboostData.cities[selectedCity].top_10_features}
+                                                            layout="vertical"
+                                                            margin={{ top: 0, right: 20, left: 10, bottom: 0 }}
+                                                        >
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
+                                                            <XAxis type="number" stroke="#ffffff50" tick={{ fill: '#ffffff50', fontSize: 11 }} />
+                                                            <YAxis
+                                                                type="category"
+                                                                dataKey="feature"
+                                                                stroke="#ffffff50"
+                                                                tick={{ fill: '#ffffff80', fontSize: 11 }}
+                                                                width={140}
+                                                            />
+                                                            <RechartsTooltip
+                                                                contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }}
+                                                                itemStyle={{ color: '#00FF94' }}
+                                                            />
+                                                            <Bar dataKey="importance" name="Importance" radius={[0, 4, 4, 0]}>
+                                                                {xgboostData.cities[selectedCity].top_10_features.map((_, idx) => (
+                                                                    <Cell key={idx} fill={idx === 0 ? '#00FF94' : idx < 3 ? '#00FF94aa' : '#00FF9455'} />
+                                                                ))}
+                                                            </Bar>
+                                                        </BarChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            ) : (
+                                                <div className="text-white/50 text-sm">No data for {selectedCity}</div>
+                                            )}
+                                        </div>
+
+                                        {/* City XGBoost Diagnostics Card */}
+                                        <div className="glass-panel p-6 rounded-2xl border border-white/10 flex flex-col justify-between">
+                                            <div>
+                                                <h3 className="text-lg font-bold flex items-center gap-2 mb-1">
+                                                    <Cpu size={18} className="text-[#00FF94]" /> {selectedCity} — XGBoost Diagnostics
+                                                </h3>
+                                                <p className="text-xs text-white/50 mb-6">Training &amp; evaluation summary for this city&apos;s model.</p>
+                                            </div>
+
+                                            {xgboostData.cities[selectedCity] ? (
+                                                <div className="space-y-4 flex-grow">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="bg-white/5 rounded-xl p-4 text-center border border-white/5">
+                                                            <div className="text-xs text-white/40 uppercase tracking-widest mb-2">Test RMSE</div>
+                                                            <div className="text-3xl font-mono font-bold text-[#00FF94]">{xgboostData.cities[selectedCity].metrics.rmse.toFixed(1)}</div>
+                                                        </div>
+                                                        <div className="bg-white/5 rounded-xl p-4 text-center border border-white/5">
+                                                            <div className="text-xs text-white/40 uppercase tracking-widest mb-2">Test MAPE</div>
+                                                            <div className="text-3xl font-mono font-bold text-white/90">{xgboostData.cities[selectedCity].metrics.mape.toFixed(1)}%</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                                        <div className="text-xs text-white/40 uppercase tracking-widest mb-2">Best Iteration (Early Stopping)</div>
+                                                        <div className="flex items-end gap-2">
+                                                            <span className="text-2xl font-mono font-bold text-white/90">{xgboostData.cities[selectedCity].best_iteration}</span>
+                                                            <span className="text-sm text-white/40 mb-0.5">/ 1000</span>
+                                                        </div>
+                                                        <div className="mt-3 w-full bg-white/5 rounded-full h-2">
+                                                            <div
+                                                                className="h-full rounded-full bg-gradient-to-r from-[#00FF94] to-[#00FF94]/50"
+                                                                style={{ width: `${(xgboostData.cities[selectedCity].best_iteration / 1000) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                                            <div className="text-xs text-white/40 uppercase tracking-widest mb-1">Training Range</div>
+                                                            <div className="text-sm font-mono text-white/70">{xgboostData.cities[selectedCity].training_range.split(' to ').join(' → ')}</div>
+                                                        </div>
+                                                        <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                                            <div className="text-xs text-white/40 uppercase tracking-widest mb-1">Testing Range</div>
+                                                            <div className="text-sm font-mono text-white/70">{xgboostData.cities[selectedCity].testing_range.split(' to ').join(' → ')}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-white/50 text-sm">No model trained for {selectedCity}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="w-full h-[400px] glass-panel rounded-2xl border border-[#ef4444]/20 flex flex-col items-center justify-center p-12 text-center bg-[#ef4444]/5">
+                                    <h2 className="text-2xl font-bold mb-3 text-[#ef4444]">Failed to load XGBoost data</h2>
+                                    <p className="text-white/60">Run train_xgboost.py or check the backend API.</p>
                                 </div>
                             )}
                         </>
