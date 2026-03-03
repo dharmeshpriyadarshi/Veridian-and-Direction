@@ -4,13 +4,11 @@ import Navbar from "@/components/Navbar";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Wind, Activity, TreePine, Skull, Zap, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useRef } from "react";
 
 const MotionLink = motion(Link);
 
 export default function Home() {
-  const containerRef = useRef(null);
-  const { scrollYProgress } = useScroll({ target: containerRef });
+  const { scrollYProgress } = useScroll();
 
   // Parallax & Opacity transforms
   const opacityHero = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
@@ -22,13 +20,13 @@ export default function Home() {
   const opacitySolution = useTransform(scrollYProgress, [0.5, 0.6, 0.8], [0, 1, 1]);
 
   return (
-    <main ref={containerRef} className="bg-veridian-black text-foreground selection:bg-veridian-primary selection:text-veridian-dark">
+    <main className="relative text-foreground selection:bg-veridian-primary selection:text-veridian-dark">
       <Navbar />
 
       {/* --------------------
           SECTION 1: HERO
          -------------------- */}
-      <section className="h-screen sticky top-0 flex flex-col justify-center items-center overflow-hidden z-10">
+      <section className="h-screen flex flex-col justify-center items-center overflow-hidden z-10 relative">
         <motion.div style={{ opacity: opacityHero, scale: scaleHero }} className="text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, scale: 2, filter: "blur(20px)" }}
@@ -61,7 +59,7 @@ export default function Home() {
       {/* --------------------
           SECTION 2: THE PROBLEM (Story)
          -------------------- */}
-      <section className="h-[150vh] relative z-20 bg-veridian-black">
+      <section className="h-[150vh] relative z-20">
         <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden">
           <motion.div style={{ opacity: opacityProblem, y: yProblem }} className="max-w-4xl px-6 relative">
             <div className="absolute -top-20 -left-20 text-[#FF4C4C] opacity-10">
@@ -88,7 +86,7 @@ export default function Home() {
       {/* --------------------
           SECTION 3: THE SOLUTION (Tech)
          -------------------- */}
-      <section className="min-h-screen relative z-30 bg-veridian-black py-32">
+      <section className="min-h-screen relative z-30 py-32">
         <motion.div style={{ opacity: opacitySolution }} className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-24">
             <span className="text-veridian-primary font-mono text-sm tracking-widest uppercase mb-4 block">System Online</span>
@@ -145,7 +143,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 text-center text-foreground/20 border-t border-white/5 relative z-30 bg-veridian-black">
+      <footer className="py-12 text-center text-foreground/20 border-t border-white/5 relative z-30">
         <p>VERIDIAN © 2026. Engineered for Earth.</p>
       </footer>
     </main>
