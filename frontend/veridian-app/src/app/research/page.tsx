@@ -3,7 +3,7 @@
 import Navbar from "@/components/Navbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Lock, Search, Filter, Cpu, Brain, Activity, Download, ChevronRight, Wind, Thermometer, Droplets, TreePine } from "lucide-react";
+import { Lock, Search, Filter, Cpu, Brain, Activity, Download, ChevronRight, Wind, Thermometer, Droplets, TreePine, Calendar, Eye, EyeOff } from "lucide-react";
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart, ComposedChart,
     BarChart, Bar, Cell, Tooltip
@@ -110,6 +110,30 @@ interface XGBoostData {
     comparison_matrix: Record<string, ComparisonEntry>;
 }
 
+interface XGBoostForecastPoint {
+    date: string;
+    predicted_aqi: number;
+}
+
+interface XGBoostForecast {
+    model: string;
+    city: string;
+    timeseries: XGBoostForecastPoint[];
+}
+
+interface ShapFeature {
+    feature: string;
+    value: number;
+    shap_value: number;
+}
+
+interface ShapData {
+    city: string;
+    date: string;
+    base_value: number;
+    features: ShapFeature[];
+}
+
 const CITIES = ["Delhi", "Mumbai", "Kolkata", "Chennai", "Bangalore"];
 const TARGET_DATE = "2026-12-31"; // Default forecast horizon for the dashboard
 
@@ -129,6 +153,15 @@ export default function ResearchPage() {
 
     // T-SMART Features
     const [showSarimaxOverlay, setShowSarimaxOverlay] = useState(false);
+
+    // XGBoost Forecast + SHAP
+    const [xgboostForecast, setXgboostForecast] = useState<XGBoostForecast | null>(null);
+    const [shapData, setShapData] = useState<ShapData | null>(null);
+    const [shapDate, setShapDate] = useState("2026-06-15");
+    const [showSarimaxLine, setShowSarimaxLine] = useState(false);
+    const [showTsmartLine, setShowTsmartLine] = useState(false);
+    const [sarimaxOverlayData, setSarimaxOverlayData] = useState<{ date: string; sarimax_aqi: number }[]>([]);
+    const [tsmartOverlayData, setTsmartOverlayData] = useState<{ date: string; tsmart_aqi: number }[]>([]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -182,10 +215,50 @@ export default function ResearchPage() {
                 const data = await res.json();
                 setXgboostData(data);
             }
+            // Also fetch the 2026 forecast
+            const forecastRes = await fetch(`http://localhost:8001/predict/xgboost?city=${selectedCity}`);
+            if (forecastRes.ok) {
+                const fData = await forecastRes.json();
+                setXgboostForecast(fData);
+            }
+            // Fetch SHAP for default date
+            fetchShapData(selectedCity, shapDate);
         } catch (err) {
             console.error("Failed to fetch XGBoost data:", err);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const fetchShapData = async (city: string, date: string) => {
+        try {
+            const res = await fetch(`http://localhost:8001/predict/xgboost/shap?city=${city}&date=${date}`);
+            if (res.ok) {
+                const data = await res.json();
+                setShapData(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch SHAP data:", err);
+        }
+    };
+
+    const fetchOverlayData = async (modelType: "sarimax" | "tsmart", city: string) => {
+        try {
+            if (modelType === "sarimax") {
+                const res = await fetch(`http://localhost:8001/predict/sarimax?city=${city}&target_date=2026-12-31`, { method: "POST" });
+                if (res.ok) {
+                    const data = await res.json();
+                    setSarimaxOverlayData(data.timeseries?.map((t: { date: string; predicted_aqi: number }) => ({ date: t.date, sarimax_aqi: t.predicted_aqi })) || []);
+                }
+            } else {
+                const res = await fetch(`http://localhost:8000/predict/tsmart?city=${city}&target_date=2026-12-31`, { method: "POST" });
+                if (res.ok) {
+                    const data = await res.json();
+                    setTsmartOverlayData(data.timeseries?.map((t: { date: string; predicted_aqi: number }) => ({ date: t.date, tsmart_aqi: t.predicted_aqi })) || []);
+                }
+            }
+        } catch (err) {
+            console.error(`Failed to fetch ${modelType} overlay:`, err);
         }
     };
 
@@ -943,6 +1016,175 @@ export default function ResearchPage() {
                                                 <div className="text-white/50 text-sm">No model trained for {selectedCity}</div>
                                             )}
                                         </div>
+                                    </div>
+
+                                    {/* 2026 FORECAST CHART WITH TRIPLE OVERLAY */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10">
+                                        <div className="flex flex-wrap justify-between items-start mb-6 gap-4">
+                                            <div>
+                                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                                    <Activity size={20} /> 2026 Recursive Forecast
+                                                </h2>
+                                                <p className="text-sm text-white/50">365-day self-sustaining XGBoost trajectory with optional model overlays</p>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        const next = !showSarimaxLine;
+                                                        setShowSarimaxLine(next);
+                                                        if (next && sarimaxOverlayData.length === 0) fetchOverlayData("sarimax", selectedCity);
+                                                    }}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${showSarimaxLine
+                                                        ? "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40"
+                                                        : "text-white/40 border-white/10 hover:border-white/30"
+                                                        }`}
+                                                >
+                                                    {showSarimaxLine ? <Eye size={14} /> : <EyeOff size={14} />} SARIMAX
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const next = !showTsmartLine;
+                                                        setShowTsmartLine(next);
+                                                        if (next && tsmartOverlayData.length === 0) fetchOverlayData("tsmart", selectedCity);
+                                                    }}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${showTsmartLine
+                                                        ? "bg-[#FF6B6B]/15 text-[#FF6B6B] border-[#FF6B6B]/40"
+                                                        : "text-white/40 border-white/10 hover:border-white/30"
+                                                        }`}
+                                                >
+                                                    {showTsmartLine ? <Eye size={14} /> : <EyeOff size={14} />} T-SMART
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {xgboostForecast ? (
+                                            <div className="h-[350px] w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <ComposedChart
+                                                        data={xgboostForecast.timeseries.map(pt => {
+                                                            const sarPt = sarimaxOverlayData.find(s => s.date === pt.date);
+                                                            const tsPt = tsmartOverlayData.find(t => t.date === pt.date);
+                                                            return {
+                                                                ...pt,
+                                                                sarimax_aqi: sarPt?.sarimax_aqi,
+                                                                tsmart_aqi: tsPt?.tsmart_aqi,
+                                                            };
+                                                        })}
+                                                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
+                                                        <XAxis
+                                                            dataKey="date"
+                                                            stroke="#ffffff30"
+                                                            tick={{ fill: '#ffffff40', fontSize: 10 }}
+                                                            tickFormatter={(d: string) => d.slice(5)}
+                                                            interval={29}
+                                                        />
+                                                        <YAxis stroke="#ffffff30" tick={{ fill: '#ffffff40', fontSize: 11 }} />
+                                                        <RechartsTooltip
+                                                            contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }}
+                                                            labelFormatter={(l) => `Date: ${l}`}
+                                                        />
+                                                        <Area type="monotone" dataKey="predicted_aqi" name="XGBoost" stroke="#00FF94" fill="#00FF9415" strokeWidth={2} />
+                                                        {showSarimaxLine && <Line type="monotone" dataKey="sarimax_aqi" name="SARIMAX" stroke="#FFD700" strokeWidth={1.5} dot={false} strokeDasharray="5 3" />}
+                                                        {showTsmartLine && <Line type="monotone" dataKey="tsmart_aqi" name="T-SMART" stroke="#FF6B6B" strokeWidth={1.5} dot={false} strokeDasharray="3 3" />}
+                                                    </ComposedChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        ) : (
+                                            <div className="h-[350px] flex items-center justify-center text-white/40">
+                                                No forecast data. Run forecast_xgboost.py first.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* SHAP WATERFALL */}
+                                    <div className="glass-panel p-6 rounded-2xl border border-white/10">
+                                        <div className="flex flex-wrap justify-between items-start mb-6 gap-4">
+                                            <div>
+                                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                                    <Search size={20} /> SHAP Transparency Layer
+                                                </h2>
+                                                <p className="text-sm text-white/50">Feature impact waterfall for {selectedCity} — what raised or lowered AQI on a specific day</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Calendar size={16} className="text-white/40" />
+                                                <input
+                                                    type="date"
+                                                    value={shapDate}
+                                                    min="2026-01-01"
+                                                    max="2026-12-31"
+                                                    onChange={(e) => {
+                                                        setShapDate(e.target.value);
+                                                        fetchShapData(selectedCity, e.target.value);
+                                                    }}
+                                                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-[#00FF94]/50"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {shapData ? (
+                                            <>
+                                                <div className="flex items-center gap-4 mb-4 text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-3 h-3 rounded bg-[#ef4444]" />
+                                                        <span className="text-white/50">Raises AQI</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-3 h-3 rounded bg-[#22c55e]" />
+                                                        <span className="text-white/50">Lowers AQI</span>
+                                                    </div>
+                                                    <div className="ml-auto text-white/40 font-mono text-xs">
+                                                        Base value: {shapData.base_value} AQI
+                                                    </div>
+                                                </div>
+                                                <div className="h-[400px] w-full">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <BarChart
+                                                            data={shapData.features.slice(0, 12)}
+                                                            layout="vertical"
+                                                            margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
+                                                        >
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" horizontal={false} />
+                                                            <XAxis
+                                                                type="number"
+                                                                stroke="#ffffff30"
+                                                                tick={{ fill: '#ffffff50', fontSize: 11 }}
+                                                                domain={['auto', 'auto']}
+                                                            />
+                                                            <YAxis
+                                                                type="category"
+                                                                dataKey="feature"
+                                                                stroke="#ffffff30"
+                                                                tick={{ fill: '#ffffff80', fontSize: 11 }}
+                                                                width={160}
+                                                            />
+                                                            <RechartsTooltip
+                                                                contentStyle={{ backgroundColor: '#050A07', borderColor: '#ffffff20', borderRadius: '8px' }}
+                                                                formatter={(val, _, props) => {
+                                                                    const v = typeof val === 'number' ? val : 0;
+                                                                    const feat = (props as unknown as { payload: ShapFeature }).payload;
+                                                                    return [`SHAP: ${v.toFixed(4)}  |  Value: ${feat.value.toFixed(2)}`, feat.feature];
+                                                                }}
+                                                            />
+                                                            <Bar dataKey="shap_value" name="SHAP Impact" radius={[0, 4, 4, 0]}>
+                                                                {shapData.features.slice(0, 12).map((feat, idx) => (
+                                                                    <Cell
+                                                                        key={idx}
+                                                                        fill={feat.shap_value >= 0 ? '#ef4444' : '#22c55e'}
+                                                                        fillOpacity={Math.min(1, 0.4 + Math.abs(feat.shap_value) / (Math.abs(shapData.features[0]?.shap_value || 1)) * 0.6)}
+                                                                    />
+                                                                ))}
+                                                            </Bar>
+                                                        </BarChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="h-[300px] flex items-center justify-center text-white/40">
+                                                Select a date to view SHAP feature impact.
+                                            </div>
+                                        )}
                                     </div>
                                 </>
                             ) : (

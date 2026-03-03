@@ -1013,3 +1013,74 @@ def get_xgboost_performance():
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# NEW: MODEL 4 XGBOOST 2026 FORECAST ENDPOINT
+# =====================================================
+_xgb_forecast_cache = {}
+
+@app.get("/predict/xgboost")
+def predict_xgboost(city: str = "Delhi"):
+    """
+    Returns the pre-computed 365-day XGBoost 2026 forecast for a city.
+    """
+    global _xgb_forecast_cache
+    forecast_path = os.path.join(ROOT_DIR, "data", "outputs", "xgboost_forecast_2026.json")
+    
+    if not os.path.exists(forecast_path):
+        raise HTTPException(status_code=404, detail="XGBoost forecast not found. Run forecast_xgboost.py first.")
+    
+    try:
+        if not _xgb_forecast_cache:
+            with open(forecast_path, "r") as f:
+                _xgb_forecast_cache = json.load(f)
+        
+        if city not in _xgb_forecast_cache:
+            raise HTTPException(status_code=404, detail=f"No XGBoost forecast for city: {city}")
+        
+        return {
+            "model": "XGBoost (Gradient Boosted Trees)",
+            "city": city,
+            "timeseries": _xgb_forecast_cache[city]["timeseries"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# NEW: MODEL 4 XGBOOST SHAP ENDPOINT
+# =====================================================
+@app.get("/predict/xgboost/shap")
+def get_xgboost_shap(city: str = "Delhi", date: str = "2026-06-15"):
+    """
+    Returns SHAP feature impact values for a specific city and date.
+    """
+    global _xgb_forecast_cache
+    forecast_path = os.path.join(ROOT_DIR, "data", "outputs", "xgboost_forecast_2026.json")
+    
+    if not os.path.exists(forecast_path):
+        raise HTTPException(status_code=404, detail="XGBoost forecast not found. Run forecast_xgboost.py first.")
+    
+    try:
+        if not _xgb_forecast_cache:
+            with open(forecast_path, "r") as f:
+                _xgb_forecast_cache = json.load(f)
+        
+        if city not in _xgb_forecast_cache:
+            raise HTTPException(status_code=404, detail=f"No XGBoost data for city: {city}")
+        
+        shap_data = _xgb_forecast_cache[city].get("shap", {})
+        if date not in shap_data:
+            raise HTTPException(status_code=404, detail=f"No SHAP data for date: {date}")
+        
+        return {
+            "city": city,
+            "date": date,
+            "base_value": shap_data[date]["base_value"],
+            "features": shap_data[date]["features"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
