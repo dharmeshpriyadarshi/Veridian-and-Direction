@@ -176,7 +176,7 @@ export default function ResearchPage() {
     const fetchSarimaxData = async (city: string) => {
         setIsLoading(true);
         try {
-            const res = await fetch(`http://localhost:8001/predict/sarimax?city=${city}&target_date=${TARGET_DATE}`, {
+            const res = await fetch(`http://localhost:8000/predict/sarimax?city=${city}&target_date=${TARGET_DATE}`, {
                 method: "POST"
             });
             if (res.ok) {
@@ -210,13 +210,13 @@ export default function ResearchPage() {
     const fetchXgboostData = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`http://localhost:8001/model/xgboost/performance`);
+            const res = await fetch(`http://localhost:8000/model/xgboost/performance`);
             if (res.ok) {
                 const data = await res.json();
                 setXgboostData(data);
             }
             // Also fetch the 2026 forecast
-            const forecastRes = await fetch(`http://localhost:8001/predict/xgboost?city=${selectedCity}`);
+            const forecastRes = await fetch(`http://localhost:8000/predict/xgboost?city=${selectedCity}`);
             if (forecastRes.ok) {
                 const fData = await forecastRes.json();
                 setXgboostForecast(fData);
@@ -232,7 +232,7 @@ export default function ResearchPage() {
 
     const fetchShapData = async (city: string, date: string) => {
         try {
-            const res = await fetch(`http://localhost:8001/predict/xgboost/shap?city=${city}&date=${date}`);
+            const res = await fetch(`http://localhost:8000/predict/xgboost/shap?city=${city}&date=${date}`);
             if (res.ok) {
                 const data = await res.json();
                 setShapData(data);
@@ -245,7 +245,7 @@ export default function ResearchPage() {
     const fetchOverlayData = async (modelType: "sarimax" | "tsmart", city: string) => {
         try {
             if (modelType === "sarimax") {
-                const res = await fetch(`http://localhost:8001/predict/sarimax?city=${city}&target_date=2026-12-31`, { method: "POST" });
+                const res = await fetch(`http://localhost:8000/predict/sarimax?city=${city}&target_date=2026-12-31`, { method: "POST" });
                 if (res.ok) {
                     const data = await res.json();
                     setSarimaxOverlayData(data.timeseries?.map((t: { date: string; predicted_aqi: number }) => ({ date: t.date, sarimax_aqi: t.predicted_aqi })) || []);

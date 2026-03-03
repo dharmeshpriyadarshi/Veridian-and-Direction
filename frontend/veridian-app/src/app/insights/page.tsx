@@ -2,7 +2,7 @@
 
 import Navbar from "@/components/Navbar";
 import { motion } from "framer-motion";
-import { Cloud, Wind, Droplets, MapPin, AlertTriangle, Activity, Search } from "lucide-react";
+import { Wind, Droplets, MapPin, AlertTriangle, Activity, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 
 // Types
