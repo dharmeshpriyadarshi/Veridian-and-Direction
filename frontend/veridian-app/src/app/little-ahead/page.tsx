@@ -90,6 +90,11 @@ export default function LittleAheadPage() {
     const [selectedCity, setSelectedCity] = useState("Delhi");
     const [cities, setCities] = useState<string[]>([]);
     const [result, setResult] = useState<PredictionResult | null>(null);
+    const [tsmartResult, setTsmartResult] = useState<any>(null);
+    const [sarimaxResult, setSarimaxResult] = useState<any>(null);
+    const [xgboostResult, setXgboostResult] = useState<any>(null);
+    const [xgbShapResult, setXgbShapResult] = useState<any>(null);
+    const [xgbPerfResult, setXgbPerfResult] = useState<any>(null);
     const [trajectoryData, setTrajectoryData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -115,23 +120,72 @@ export default function LittleAheadPage() {
         setLoading(true);
         setError("");
         setResult(null);
+        setTsmartResult(null);
+        setSarimaxResult(null);
+        setXgboostResult(null);
+        setXgbShapResult(null);
+        setXgbPerfResult(null);
         setTrajectoryData(null);
         setShowEvaluation(false);
         setShowYearlyBreakdown(false);
 
         try {
-            const res = await fetch(`http://127.0.0.1:8000/predict-anchor?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`);
-            if (!res.ok) {
-                const errData = await res.json();
+            const [anchorRes, tsmartRes, sarimaxRes, xgboostRes, shapRes, perfRes] = await Promise.all([
+                fetch(`http://127.0.0.1:8000/predict-anchor?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`),
+                fetch(`http://127.0.0.1:8000/predict/tsmart?target_date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`, { method: "POST" }).catch(() => null),
+                fetch(`http://127.0.0.1:8000/predict/sarimax?target_date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`, { method: "POST" }).catch(() => null),
+                fetch(`http://127.0.0.1:8000/predict/xgboost?city=${encodeURIComponent(selectedCity)}`).catch(() => null),
+                fetch(`http://127.0.0.1:8000/predict/xgboost/shap?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`).catch(() => null),
+                fetch(`http://127.0.0.1:8000/model/xgboost/performance`).catch(() => null)
+            ]);
+
+            if (!anchorRes.ok) {
+                const errData = await anchorRes.json();
                 throw new Error(errData.detail || "Prediction failed.");
             }
-            const data: PredictionResult = await res.json();
+            const data: PredictionResult = await anchorRes.json();
             setResult(data);
+
+            if (tsmartRes && tsmartRes.ok) {
+                const tData = await tsmartRes.json();
+                setTsmartResult(tData);
+            }
+            if (sarimaxRes && sarimaxRes.ok) {
+                const sData = await sarimaxRes.json();
+                setSarimaxResult(sData);
+            }
+            if (xgboostRes && xgboostRes.ok) {
+                const xData = await xgboostRes.json();
+                const match = xData.timeseries?.find((t: any) => t.date === selectedDate);
+                if (match) {
+                    setXgboostResult({ ...xData, predicted_aqi: match.predicted_aqi });
+                } else {
+                    setXgboostResult(xData);
+                }
+            }
+            if (shapRes && shapRes.ok) {
+                const shapData = await shapRes.json();
+                setXgbShapResult(shapData);
+            }
+            if (perfRes && perfRes.ok) {
+                const perfData = await perfRes.json();
+                setXgbPerfResult(perfData);
+            }
         } catch (err: any) {
             setError(err.message || "Could not connect to the ML Engine. Is the API running?");
         } finally {
             setLoading(false);
         }
+    };
+
+    const getAqiCategoryInfo = (aqi: number) => {
+        if (!aqi) return { category: "Unknown", color: "#ffffff" };
+        if (aqi <= 50) return { category: "Good", color: "#4ade80" };
+        if (aqi <= 100) return { category: "Satisfactory", color: "#a3e635" };
+        if (aqi <= 200) return { category: "Moderate", color: "#facc15" };
+        if (aqi <= 300) return { category: "Poor", color: "#fb923c" };
+        if (aqi <= 400) return { category: "Very Poor", color: "#ef4444" };
+        return { category: "Severe", color: "#991b1b" };
     };
 
     const getSeverityWidth = (aqi: number) => Math.min((aqi / 500) * 100, 100);
@@ -335,6 +389,191 @@ export default function LittleAheadPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* ============================================ */}
+                            {/*  MODEL 2: T-SMART (ADAPTIVE BRAIN)           */}
+                            {/* ============================================ */}
+                            {tsmartResult && (
+                                <div className="glass-panel rounded-3xl p-8 mb-6">
+                                    <div className="flex items-center gap-2 text-foreground/40 text-sm uppercase tracking-widest mb-6">
+                                        <GitMerge size={14} />
+                                        Method 2 — T-SMART (Adaptive Brain) for {result.prediction.city}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div className="lg:col-span-1 flex flex-col items-center justify-center">
+                                            <p className="text-foreground/50 text-sm mb-1">{result.prediction.city}</p>
+                                            <p className="text-foreground/40 text-xs mb-3">{result.prediction.display_date}, 2026</p>
+
+                                            {(() => {
+                                                const match = tsmartResult.timeseries?.find((t: any) => t.date === selectedDate);
+                                                const aqi = match?.predicted_aqi || 0;
+                                                const catInfo = getAqiCategoryInfo(aqi);
+
+                                                return (
+                                                    <>
+                                                        <div className={`text-7xl md:text-8xl font-bold bg-gradient-to-b ${getAqiGradient(aqi)} bg-clip-text text-transparent`}>
+                                                            {aqi || "—"}
+                                                        </div>
+                                                        <p className="text-foreground/50 text-sm mt-1">Predicted AQI</p>
+                                                        <div
+                                                            className="mt-4 px-5 py-2 rounded-full text-sm font-bold uppercase tracking-wider"
+                                                            style={{
+                                                                backgroundColor: `${catInfo.color}22`,
+                                                                color: catInfo.color,
+                                                                border: `1px solid ${catInfo.color}44`
+                                                            }}
+                                                        >
+                                                            {catInfo.category}
+                                                        </div>
+                                                    </>
+                                                )
+                                            })()}
+                                        </div>
+
+                                        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <StatCard icon={<Database size={16} />} label="Matched Year" value={tsmartResult.intensity_adjustment?.historical_base_year || "—"} />
+                                            <StatCard icon={<ShieldCheck size={16} />} label="Match Confidence" value={tsmartResult.insight_narrative?.confidence_score || "—"} />
+                                            <StatCard icon={<TrendingUp size={16} />} label="Drift Velocity" value={tsmartResult.insight_narrative?.drift_velocity ? `${tsmartResult.insight_narrative.drift_velocity > 0 ? '+' : ''}${tsmartResult.insight_narrative.drift_velocity} days` : "—"} />
+                                            <StatCard icon={<Activity size={16} />} label="Intensity Adj" value={tsmartResult.intensity_adjustment?.percentage ? `${tsmartResult.intensity_adjustment.percentage > 0 ? '+' : ''}${tsmartResult.intensity_adjustment.percentage.toFixed(1)}%` : "—"} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ============================================ */}
+                            {/*  MODEL 3: SARIMAX (STATISTICAL)              */}
+                            {/* ============================================ */}
+                            {sarimaxResult && (
+                                <div className="glass-panel rounded-3xl p-8 mb-6">
+                                    <div className="flex items-center gap-2 text-foreground/40 text-sm uppercase tracking-widest mb-6">
+                                        <Layers size={14} />
+                                        Method 3 — SARIMAX Statistical Forecast for {result.prediction.city}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div className="lg:col-span-1 flex flex-col items-center justify-center">
+                                            <p className="text-foreground/50 text-sm mb-1">{result.prediction.city}</p>
+                                            <p className="text-foreground/40 text-xs mb-3">{result.prediction.display_date}, 2026</p>
+
+                                            {(() => {
+                                                const aqi = sarimaxResult.predicted_aqi || 0;
+                                                const catInfo = getAqiCategoryInfo(aqi);
+
+                                                return (
+                                                    <>
+                                                        <div className={`text-7xl md:text-8xl font-bold bg-gradient-to-b ${getAqiGradient(aqi)} bg-clip-text text-transparent`}>
+                                                            {aqi || "—"}
+                                                        </div>
+                                                        <p className="text-foreground/50 text-sm mt-1">Predicted AQI</p>
+                                                        <div
+                                                            className="mt-4 px-5 py-2 rounded-full text-sm font-bold uppercase tracking-wider"
+                                                            style={{
+                                                                backgroundColor: `${catInfo.color}22`,
+                                                                color: catInfo.color,
+                                                                border: `1px solid ${catInfo.color}44`
+                                                            }}
+                                                        >
+                                                            {catInfo.category}
+                                                        </div>
+                                                    </>
+                                                )
+                                            })()}
+                                        </div>
+
+                                        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {(() => {
+                                                const match = sarimaxResult.timeseries?.find((t: any) => t.date === selectedDate);
+                                                const pulse = match?.pulse_pct ? `${match.pulse_pct.toFixed(1)}%` : "—";
+                                                const ciRange = sarimaxResult.lower_bound && sarimaxResult.upper_bound
+                                                    ? `${sarimaxResult.lower_bound} — ${sarimaxResult.upper_bound}`
+                                                    : "—";
+
+                                                const drDom = sarimaxResult.driver_dominance?.find((d: any) => d.date === selectedDate) || sarimaxResult.driver_dominance?.[sarimaxResult.driver_dominance.length - 1];
+                                                let domDriver = "—";
+                                                if (drDom) {
+                                                    const drivers = { "Wind Speed": drDom.wind_pct, "Temperature": drDom.temp_pct, "Humidity": drDom.humid_pct, "System Memory": drDom.ar_pct };
+                                                    domDriver = Object.keys(drivers).reduce((a, b) => drivers[a as keyof typeof drivers] > drivers[b as keyof typeof drivers] ? a : b);
+                                                }
+
+                                                const rmse = sarimaxResult.metrics_on_test_set?.RMSE ? sarimaxResult.metrics_on_test_set.RMSE.toFixed(2) : "—";
+
+                                                return (
+                                                    <>
+                                                        <StatCard icon={<Layers size={16} />} label="95% CI Range" value={ciRange} />
+                                                        <StatCard icon={<Cpu size={16} />} label="Dominant Driver" value={domDriver} />
+                                                        <StatCard icon={<ShieldCheck size={16} />} label="Model Confidence" value={pulse} sublabel="Pulse Metric Width" />
+                                                        <StatCard icon={<Activity size={16} />} label="RMSE Score" value={rmse} />
+                                                    </>
+                                                )
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ============================================ */}
+                            {/*  MODEL 4: XGBOOST (MACHINE LEARNING)         */}
+                            {/* ============================================ */}
+                            {xgboostResult && (
+                                <div className="glass-panel rounded-3xl p-8 mb-6">
+                                    <div className="flex items-center gap-2 text-foreground/40 text-sm uppercase tracking-widest mb-6">
+                                        <Cpu size={14} />
+                                        Method 4 — XGBoost Machine Learning for {result.prediction.city}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div className="lg:col-span-1 flex flex-col items-center justify-center">
+                                            <p className="text-foreground/50 text-sm mb-1">{result.prediction.city}</p>
+                                            <p className="text-foreground/40 text-xs mb-3">{result.prediction.display_date}, 2026</p>
+
+                                            {(() => {
+                                                const aqi = xgboostResult.predicted_aqi || 0;
+                                                const catInfo = getAqiCategoryInfo(aqi);
+
+                                                return (
+                                                    <>
+                                                        <div className={`text-7xl md:text-8xl font-bold bg-gradient-to-b ${getAqiGradient(aqi)} bg-clip-text text-transparent`}>
+                                                            {aqi || "—"}
+                                                        </div>
+                                                        <p className="text-foreground/50 text-sm mt-1">Predicted AQI</p>
+                                                        <div
+                                                            className="mt-4 px-5 py-2 rounded-full text-sm font-bold uppercase tracking-wider"
+                                                            style={{
+                                                                backgroundColor: `${catInfo.color}22`,
+                                                                color: catInfo.color,
+                                                                border: `1px solid ${catInfo.color}44`
+                                                            }}
+                                                        >
+                                                            {catInfo.category}
+                                                        </div>
+                                                    </>
+                                                )
+                                            })()}
+                                        </div>
+
+                                        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {(() => {
+                                                const topFeature = xgbShapResult?.features?.[0]?.feature || "—";
+                                                const shapImpact = xgbShapResult?.features?.[0]?.shap_value ? `${xgbShapResult.features[0].shap_value > 0 ? '+' : ''}${xgbShapResult.features[0].shap_value.toFixed(2)}` : "—";
+
+                                                const recurDepth = Math.floor((new Date(selectedDate).getTime() - new Date("2024-12-31").getTime()) / (1000 * 3600 * 24));
+
+                                                const mape = xgbPerfResult?.cities?.[selectedCity]?.metrics?.mape ? `${xgbPerfResult.cities[selectedCity].metrics.mape.toFixed(1)}%` : "—";
+
+                                                return (
+                                                    <>
+                                                        <StatCard icon={<TrendingUp size={16} />} label="Top Feature" value={topFeature} />
+                                                        <StatCard icon={<Activity size={16} />} label="SHAP Impact" value={shapImpact} />
+                                                        <StatCard icon={<Layers size={16} />} label="Recursive Depth" value={`${recurDepth > 0 ? recurDepth : 0} days`} sublabel="Since last real data" />
+                                                        <StatCard icon={<ShieldCheck size={16} />} label="ML Accuracy" value={mape} sublabel="MAPE Score" />
+                                                    </>
+                                                )
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* ============================================ */}
                             {/*  YEAR-BY-YEAR HISTORICAL BREAKDOWN           */}
