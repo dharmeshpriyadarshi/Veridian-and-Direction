@@ -3,11 +3,12 @@
 import Navbar from "@/components/Navbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Lock, Search, Filter, Cpu, Brain, Activity, Download, ChevronRight, Wind, Thermometer, Droplets, TreePine, Calendar, Eye, EyeOff, MapPin } from "lucide-react";
+import { Lock, Search, Filter, Cpu, Brain, Activity, Download, ChevronRight, Wind, Thermometer, Droplets, TreePine, Calendar, Eye, EyeOff, MapPin, Database, TrendingUp, ChevronDown, ChevronUp, Layers, GitMerge, ShieldCheck, ArrowUpRight, ArrowDownRight, Minus, AlertCircle } from "lucide-react";
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart, ComposedChart,
-    BarChart, Bar, Cell, Tooltip
+    BarChart, Bar, Cell, Tooltip, ReferenceLine
 } from 'recharts';
+import PredictionGrid, { PredictionResult } from "@/components/PredictionGrid";
 
 interface ForecastPoint {
     date: string;
@@ -165,6 +166,21 @@ export default function ResearchPage() {
     const [sarimaxOverlayData, setSarimaxOverlayData] = useState<{ date: string; sarimax_aqi: number }[]>([]);
     const [tsmartOverlayData, setTsmartOverlayData] = useState<{ date: string; tsmart_aqi: number }[]>([]);
 
+    // Specific Date Analysis State
+    const [diagLoading, setDiagLoading] = useState(false);
+    const [diagError, setDiagError] = useState("");
+    const [diagResult, setDiagResult] = useState<PredictionResult | null>(null);
+    const [diagTsmart, setDiagTsmart] = useState<any>(null);
+    const [diagSarimax, setDiagSarimax] = useState<any>(null);
+    const [diagXgboost, setDiagXgboost] = useState<any>(null);
+    const [diagXgbShap, setDiagXgbShap] = useState<any>(null);
+    const [diagXgbPerf, setDiagXgbPerf] = useState<any>(null);
+    const [trajectoryData, setTrajectoryData] = useState<any>(null);
+
+    // Deep-dive UI toggles
+    const [showYearlyBreakdown, setShowYearlyBreakdown] = useState(false);
+    const [showEvaluation, setShowEvaluation] = useState(false);
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         if (passcode === "VERIDIAN" || passcode === "admin") {
@@ -276,6 +292,73 @@ export default function ResearchPage() {
         }
     }, [isLoggedIn, selectedCity, activeModel]);
 
+    const handleRunDiagnostic = async () => {
+        if (!selectedDate) {
+            setDiagError("Please select a date in 2026.");
+            return;
+        }
+
+        setDiagLoading(true);
+        setDiagError("");
+        setDiagResult(null);
+        setDiagTsmart(null);
+        setDiagSarimax(null);
+        setDiagXgboost(null);
+        setDiagXgbShap(null);
+        setDiagXgbPerf(null);
+        setTrajectoryData(null);
+        setShowEvaluation(false);
+        setShowYearlyBreakdown(false);
+
+        try {
+            const [anchorRes, tsmartRes, sarimaxRes, xgboostRes, shapRes, perfRes] = await Promise.all([
+                fetch(`http://127.0.0.1:8000/predict-anchor?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`),
+                fetch(`http://127.0.0.1:8000/predict/tsmart?target_date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`, { method: "POST" }).catch(() => null),
+                fetch(`http://127.0.0.1:8000/predict/sarimax?target_date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`, { method: "POST" }).catch(() => null),
+                fetch(`http://127.0.0.1:8000/predict/xgboost?city=${encodeURIComponent(selectedCity)}`).catch(() => null),
+                fetch(`http://127.0.0.1:8000/predict/xgboost/shap?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`).catch(() => null),
+                fetch(`http://127.0.0.1:8000/model/xgboost/performance`).catch(() => null)
+            ]);
+
+            if (!anchorRes.ok) {
+                const errData = await anchorRes.json();
+                throw new Error(errData.detail || "Prediction failed.");
+            }
+            const data: PredictionResult = await anchorRes.json();
+            setDiagResult(data);
+
+            if (tsmartRes && tsmartRes.ok) {
+                const tData = await tsmartRes.json();
+                setDiagTsmart(tData);
+            }
+            if (sarimaxRes && sarimaxRes.ok) {
+                const sData = await sarimaxRes.json();
+                setDiagSarimax(sData);
+            }
+            if (xgboostRes && xgboostRes.ok) {
+                const xData = await xgboostRes.json();
+                const match = xData.timeseries?.find((t: any) => t.date === selectedDate);
+                if (match) {
+                    setDiagXgboost({ ...xData, predicted_aqi: match.predicted_aqi });
+                } else {
+                    setDiagXgboost(xData);
+                }
+            }
+            if (shapRes && shapRes.ok) {
+                const shapData = await shapRes.json();
+                setDiagXgbShap(shapData);
+            }
+            if (perfRes && perfRes.ok) {
+                const perfData = await perfRes.json();
+                setDiagXgbPerf(perfData);
+            }
+        } catch (err: any) {
+            setDiagError(err.message || "Could not connect to the ML Engine.");
+        } finally {
+            setDiagLoading(false);
+        }
+    };
+
     // Data Transformation for the T-SMART Combined Chart
     const formatTsmartChartData = () => {
         if (!tsmartData) return [];
@@ -306,6 +389,14 @@ export default function ResearchPage() {
             );
         }
         return null;
+    };
+
+    const getDeviationColor = (z: number) => {
+        if (z < -1) return "#4ade80";
+        if (z < -0.3) return "#86efac";
+        if (z < 0.3) return "#fbbf24";
+        if (z < 1) return "#fb923c";
+        return "#ef4444";
     };
 
 
@@ -436,6 +527,248 @@ export default function ResearchPage() {
                                 />
                             </div>
                         </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4 mt-6">
+                            <button
+                                onClick={handleRunDiagnostic}
+                                disabled={diagLoading || !selectedDate}
+                                className="px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3
+                                           bg-gradient-to-r from-[var(--veridian-primary)] to-[var(--veridian-accent)] text-[var(--veridian-black)]
+                                           hover:shadow-lg hover:shadow-[var(--veridian-primary)]/20 hover:scale-[1.02]
+                                           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full sm:w-auto"
+                            >
+                                {diagLoading ? (
+                                    <div className="w-6 h-6 border-2 border-[var(--veridian-black)]/30 border-t-[var(--veridian-black)] rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <Cpu size={20} />
+                                        Run Diagnostic Prediction
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                        {diagError && <p className="text-red-400 mt-4 text-sm">{diagError}</p>}
+                    </div>
+                )}
+
+                {/* Render the extracted PredictionGrid for Specific Date Analysis tab */}
+                {activeTab === "Specific Date Analysis" && diagResult && (
+                    <div className="mb-12">
+                        <PredictionGrid
+                            result={diagResult}
+                            tsmartResult={diagTsmart}
+                            sarimaxResult={diagSarimax}
+                            xgboostResult={diagXgboost}
+                            xgbShapResult={diagXgbShap}
+                            xgbPerfResult={diagXgbPerf}
+                            selectedDate={selectedDate}
+                            selectedCity={selectedCity}
+                        />
+
+                        {/* ============================================ */}
+                        {/*  YEAR-BY-YEAR HISTORICAL BREAKDOWN           */}
+                        {/* ============================================ */}
+                        <div className="glass-panel rounded-3xl overflow-hidden mb-6">
+                            <button
+                                onClick={() => setShowYearlyBreakdown(!showYearlyBreakdown)}
+                                className="w-full p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                        <Database size={16} className="text-blue-400" />
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="font-bold">Year-by-Year Historical Data</p>
+                                        <p className="text-foreground/40 text-sm">
+                                            Exact readings for {diagResult.prediction.display_date} from the dataset, compared to each year&apos;s average
+                                        </p>
+                                    </div>
+                                </div>
+                                {showYearlyBreakdown ? <ChevronUp size={20} className="text-foreground/40" /> : <ChevronDown size={20} className="text-foreground/40" />}
+                            </button>
+
+                            <AnimatePresence>
+                                {showYearlyBreakdown && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="px-6 pb-6">
+                                            {/* Table Header */}
+                                            <div className="grid gap-2 text-xs text-foreground/40 uppercase tracking-wider font-medium pb-3 border-b border-white/5 mb-2" style={{ gridTemplateColumns: '1fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 2fr' }}>
+                                                <div>Year</div>
+                                                <div className="text-right">Exact AQI</div>
+                                                <div className="text-right">Exact PM2.5</div>
+                                                <div className="text-right">Year AQI Avg</div>
+                                                <div className="text-right">Deviation</div>
+                                                <div className="text-right">Z-Score</div>
+                                                <div>Assessment</div>
+                                            </div>
+
+                                            {/* Table Rows */}
+                                            {diagResult.yearly_breakdown.map((yr, i) => (
+                                                <motion.div
+                                                    key={yr.year}
+                                                    initial={{ opacity: 0, x: -15 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: i * 0.05 }}
+                                                    className="py-3 border-b border-white/[0.03] items-center hover:bg-white/[0.02] rounded-lg transition-colors"
+                                                    style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr 2fr', gap: '0.5rem' }}
+                                                >
+                                                    <div className="font-bold text-foreground/70">{yr.year}</div>
+                                                    <div className="text-right font-mono font-bold" style={{ color: getDeviationColor(-yr.z_score + 1) }}>
+                                                        {yr.day_aqi ?? '—'}
+                                                    </div>
+                                                    <div className="text-right font-mono text-foreground/40">
+                                                        {yr.day_pm25 ?? '—'}
+                                                    </div>
+                                                    <div className="text-right text-foreground/50 font-mono">
+                                                        {yr.year_aqi_mean ?? '—'}
+                                                    </div>
+                                                    <div className="text-right flex items-center justify-end gap-1">
+                                                        {yr.deviation > 5 ? (
+                                                            <ArrowUpRight size={14} className="text-red-400" />
+                                                        ) : yr.deviation < -5 ? (
+                                                            <ArrowDownRight size={14} className="text-green-400" />
+                                                        ) : (
+                                                            <Minus size={14} className="text-yellow-400" />
+                                                        )}
+                                                        <span className={`font-mono text-sm ${yr.deviation > 5 ? 'text-red-400' : yr.deviation < -5 ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                            {yr.deviation > 0 ? '+' : ''}{yr.deviation}
+                                                        </span>
+                                                        <span className="text-foreground/25 text-xs">({yr.deviation_pct > 0 ? '+' : ''}{yr.deviation_pct}%)</span>
+                                                    </div>
+                                                    <div className="text-right font-mono text-sm" style={{ color: getDeviationColor(yr.z_score) }}>
+                                                        {yr.z_score > 0 ? '+' : ''}{yr.z_score}σ
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-xs px-2 py-1 rounded-md font-medium"
+                                                            style={{
+                                                                backgroundColor: getDeviationColor(yr.z_score) + "18",
+                                                                color: getDeviationColor(yr.z_score)
+                                                            }}
+                                                        >
+                                                            {yr.interpretation}
+                                                        </span>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+
+                                            {/* Summary row */}
+                                            <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                                                <p className="text-xs text-foreground/40 mb-2 uppercase tracking-wider">Key Insight</p>
+                                                <p className="text-sm text-foreground/60">
+                                                    {(() => {
+                                                        const aboveCount = diagResult.yearly_breakdown.filter((y: any) => y.z_score > 0.5).length;
+                                                        const belowCount = diagResult.yearly_breakdown.filter((y: any) => y.z_score < -0.5).length;
+                                                        const total = diagResult.yearly_breakdown.length;
+                                                        if (aboveCount > total / 2) {
+                                                            return `${diagResult.prediction.display_date} is typically a WORSE day than the annual average — it scored above the year mean in ${aboveCount}/${total} years. This is likely a seasonally high-pollution period.`;
+                                                        } else if (belowCount > total / 2) {
+                                                            return `${diagResult.prediction.display_date} is typically a BETTER day than the annual average — it scored below the year mean in ${belowCount}/${total} years. This is likely a seasonally cleaner period.`;
+                                                        }
+                                                        return `${diagResult.prediction.display_date} shows mixed performance across years — sometimes better, sometimes worse than the annual average. No strong seasonal bias detected.`;
+                                                    })()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* ============================================ */}
+                        {/*  EVALUATION / TRANSPARENCY SECTION           */}
+                        {/* ============================================ */}
+                        <div className="glass-panel rounded-3xl overflow-hidden mb-6">
+                            <button
+                                onClick={() => setShowEvaluation(!showEvaluation)}
+                                className="w-full p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--veridian-primary)]/10 flex items-center justify-center">
+                                        <Lock size={16} className="text-[var(--veridian-primary)]" />
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="font-bold">How did we reach this conclusion?</p>
+                                        <p className="text-foreground/40 text-sm">{diagResult.evaluation.method}</p>
+                                    </div>
+                                </div>
+                                {showEvaluation ? <ChevronUp size={20} className="text-foreground/40" /> : <ChevronDown size={20} className="text-foreground/40" />}
+                            </button>
+
+                            <AnimatePresence>
+                                {showEvaluation && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="px-6 pb-8">
+                                            <p className="text-foreground/50 text-sm mb-6 pl-11">
+                                                {diagResult.evaluation.description}
+                                            </p>
+
+                                            {/* Step-by-step pipeline */}
+                                            <div className="space-y-1 pl-4">
+                                                {diagResult.evaluation.steps.map((step: any, i: number) => (
+                                                    <motion.div
+                                                        key={step.step}
+                                                        initial={{ opacity: 0, x: -20 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ delay: i * 0.08 }}
+                                                        className="flex items-start gap-4"
+                                                    >
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-8 h-8 rounded-full bg-[var(--veridian-primary)]/15 border border-[var(--veridian-primary)]/30 
+                                                                            flex items-center justify-center text-xs font-bold text-[var(--veridian-primary)] flex-shrink-0">
+                                                                {step.step}
+                                                            </div>
+                                                            {i < diagResult.evaluation.steps.length - 1 && (
+                                                                <div className="w-px h-6 bg-[var(--veridian-primary)]/15" />
+                                                            )}
+                                                        </div>
+                                                        <div className="pt-1 pb-4">
+                                                            <p className="text-sm font-bold text-foreground/80">{step.title}</p>
+                                                            <p className="text-sm text-foreground/40">{step.detail}</p>
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* ============================================ */}
+                        {/*  HISTORICAL DRIFT TABLE (Module 1)           */}
+                        {/* ============================================ */}
+                        <HistoricalDriftTable
+                            defaultCity={selectedCity}
+                            defaultMonth={selectedDate ? parseInt(selectedDate.split('-')[1], 10) : 1}
+                        />
+
+                        {/* ============================================ */}
+                        {/*  METHOD 2: TRAJECTORY VECTOR                 */}
+                        {/* ============================================ */}
+                        <TrajectoryVector city={selectedCity} targetDate={selectedDate} onDataLoaded={setTrajectoryData} />
+
+                        {/* ============================================ */}
+                        {/*  MODULE 3: SURGE OVERLAY                     */}
+                        {/* ============================================ */}
+                        <Module3SurgeOverlay result={diagResult} />
+
+                        {/* ============================================ */}
+                        {/*  MODULE 4: INSIGHT ENGINE                    */}
+                        {/* ============================================ */}
+                        {trajectoryData && <ResearchInsightCard result={diagResult} trajectory={trajectoryData} />}
+
                     </div>
                 )}
 
@@ -1275,5 +1608,582 @@ export default function ResearchPage() {
                 )}
             </div>
         </main>
+    );
+}
+
+/* =========================================== */
+/*  Reusable Stat Card Component               */
+/* =========================================== */
+function StatCard({ icon, label, value, sublabel }: { icon: React.ReactNode; label: string; value: string; sublabel?: string }) {
+    return (
+        <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/5 hover:border-white/10 transition-colors">
+            <div className="flex items-center gap-2 text-foreground/40 mb-2">
+                {icon}
+                <span className="text-xs uppercase tracking-wider font-medium">{label}</span>
+            </div>
+            <p className="text-xl font-bold">{value}</p>
+            {sublabel && <p className="text-xs text-foreground/30 mt-1">{sublabel}</p>}
+        </div>
+    );
+}
+
+/* =========================================== */
+/*  Historical Drift Table                     */
+/* =========================================== */
+interface HistoricalSpike {
+    month: number;
+    year: number;
+    centroid_date: string;
+    peak_aqi_average: number;
+}
+
+function HistoricalDriftTable({ defaultCity = "Delhi", defaultMonth = 1 }: { defaultCity?: string; defaultMonth?: number }) {
+    const [spikes, setSpikes] = useState<HistoricalSpike[]>([]);
+    const [selectedMonth, setSelectedMonth] = useState<number>(defaultMonth);
+    const [selectedCity, setSelectedCity] = useState<string>(defaultCity);
+    const [cities, setCities] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Load available cities
+    useEffect(() => {
+        fetch("http://127.0.0.1:8000/cities")
+            .then(res => res.json())
+            .then(data => {
+                if (data.cities) setCities(data.cities);
+            })
+            .catch(() => setCities(["Delhi"])); // fallback
+    }, []);
+
+    // Sync state when props change
+    useEffect(() => {
+        if (defaultCity) setSelectedCity(defaultCity);
+        if (defaultMonth) setSelectedMonth(defaultMonth);
+    }, [defaultCity, defaultMonth]);
+
+    // Load spikes when city changes
+    useEffect(() => {
+        setLoading(true);
+        fetch(`http://127.0.0.1:8000/tsmart/historical_spikes?city=${encodeURIComponent(selectedCity)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setSpikes(data);
+                } else {
+                    setSpikes([]);
+                }
+            })
+            .catch(err => {
+                console.error("Could not load historical spikes:", err);
+                setSpikes([]);
+            })
+            .finally(() => setLoading(false));
+    }, [selectedCity]);
+
+    const months = [
+        { value: 1, label: "January" }, { value: 2, label: "February" },
+        { value: 3, label: "March" }, { value: 4, label: "April" },
+        { value: 5, label: "May" }, { value: 6, label: "June" },
+        { value: 7, label: "July" }, { value: 8, label: "August" },
+        { value: 9, label: "September" }, { value: 10, label: "October" },
+        { value: 11, label: "November" }, { value: 12, label: "December" }
+    ];
+
+    const filteredSpikes = spikes.filter(s => s.month === selectedMonth).sort((a, b) => a.year - b.year);
+
+    return (
+        <div className="glass-panel rounded-3xl p-8 mb-8 border border-[var(--veridian-accent)]/20">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+                <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--veridian-accent)]/20 flex items-center justify-center">
+                            <TrendingUp size={20} className="text-[var(--veridian-accent)]" />
+                        </div>
+                        <h2 className="text-2xl font-bold">T-SMART: Historical Spike Drift Tracker</h2>
+                    </div>
+                    <p className="text-foreground/50 text-sm pl-13">
+                        <span className="text-[var(--veridian-accent)] font-medium">Module 1 (Deep Observation):</span> Tracking the &quot;Highest 7-Day AQI Window&quot; for each month over the last 10 years to observe its temporal drift.
+                    </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                    {/* City Dropdown */}
+                    <div className="relative w-full sm:w-48">
+                        <select
+                            value={selectedCity}
+                            onChange={(e) => setSelectedCity(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-foreground font-medium
+                                       focus:outline-none focus:border-[var(--veridian-accent)] focus:ring-1 focus:ring-[var(--veridian-accent)]/30
+                                       appearance-none cursor-pointer"
+                            style={{ colorScheme: "dark" }}
+                        >
+                            {cities.map(c => (
+                                <option key={c} value={c} className="bg-[#1a2012]">{c}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
+                            <ChevronDown size={16} />
+                        </div>
+                    </div>
+
+                    {/* Month Dropdown */}
+                    <div className="relative w-full sm:w-48">
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-foreground font-medium
+                                       focus:outline-none focus:border-[var(--veridian-accent)] focus:ring-1 focus:ring-[var(--veridian-accent)]/30
+                                       appearance-none cursor-pointer"
+                            style={{ colorScheme: "dark" }}
+                        >
+                            {months.map(m => (
+                                <option key={m.value} value={m.value} className="bg-[#1a2012]">{m.label}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-foreground/40">
+                            <ChevronDown size={16} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-[var(--veridian-accent)]/30 border-t-[var(--veridian-accent)] rounded-full animate-spin" />
+                </div>
+            ) : filteredSpikes.length === 0 ? (
+                <div className="text-center py-12 text-foreground/40 bg-white/5 rounded-2xl">
+                    No historical spike data found for {selectedCity} in {months.find(m => m.value === selectedMonth)?.label}.
+                    Ensure the dataset is processed.
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-white/10 text-foreground/40 text-xs uppercase tracking-wider">
+                                <th className="pb-4 font-medium pl-4">Year</th>
+                                <th className="pb-4 font-medium">Peak Shift (Centroid Date)</th>
+                                <th className="pb-4 font-medium text-right pr-4">7-Day Max AQI Average</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredSpikes.map((spike, idx) => {
+                                const prevSpike = idx > 0 ? filteredSpikes[idx - 1] : null;
+                                let shiftDays = 0;
+                                let shiftLabel = "—";
+
+                                if (prevSpike) {
+                                    // Calculate exact day shift (handling bleed into Dec/Feb correctly)
+                                    const d1 = new Date(spike.centroid_date);
+                                    const d2 = new Date(prevSpike.centroid_date);
+
+                                    // Project the previous spike's logical year to the current spike's logical year
+                                    // so we can see the literal drift in days regardless of if it fell in Dec or Jan
+                                    d2.setFullYear(d2.getFullYear() + (spike.year - prevSpike.year));
+
+                                    shiftDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    if (Math.abs(shiftDays) > 45) {
+                                        shiftLabel = `Pattern Broken (${shiftDays > 0 ? '+' : ''}${shiftDays}d)`;
+                                    } else if (shiftDays > 0) {
+                                        shiftLabel = `+${shiftDays} days (Forward)`;
+                                    } else if (shiftDays < 0) {
+                                        shiftLabel = `${shiftDays} days (Backward)`;
+                                    } else {
+                                        shiftLabel = "Static";
+                                    }
+                                }
+
+                                return (
+                                    <tr key={spike.year} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+                                        <td className="py-4 pl-4 font-bold text-lg">{spike.year}</td>
+                                        <td className="py-4">
+                                            <div className="flex items-center gap-4">
+                                                <span className="font-mono text-[var(--veridian-primary)] bg-[var(--veridian-primary)]/10 px-3 py-1 rounded-md">
+                                                    {spike.centroid_date}
+                                                </span>
+                                                <span className={`text-xs font-mono 
+                                                    ${shiftDays > 0 ? 'text-orange-400' : shiftDays < 0 ? 'text-blue-400' : 'text-foreground/30'}
+                                                    opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                                    {shiftLabel}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="py-4 pr-4 text-right">
+                                            <div className="flex justify-end items-center gap-3">
+                                                <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full"
+                                                        style={{
+                                                            width: `${Math.min((spike.peak_aqi_average / 500) * 100, 100)}%`,
+                                                            backgroundColor: spike.peak_aqi_average > 300 ? '#ef4444' : spike.peak_aqi_average > 200 ? '#facc15' : '#4ade80'
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="font-mono font-bold w-12 text-right">
+                                                    {spike.peak_aqi_average.toFixed(1)}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* =========================================== */
+/*  Trajectory Vector (Module 2)               */
+/* =========================================== */
+function TrajectoryVector({ city, targetDate, onDataLoaded }: { city: string; targetDate: string; onDataLoaded?: (data: any) => void }) {
+    const [data, setData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!city || !targetDate) return;
+        setLoading(true);
+        setError("");
+        fetch(`http://127.0.0.1:8000/tsmart/trajectory_vector?city=${encodeURIComponent(city)}&target_date=${encodeURIComponent(targetDate)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Could not fetch trajectory vector.");
+                return res.json();
+            })
+            .then(resData => {
+                if (resData.detail) throw new Error(resData.detail);
+                setData(resData);
+                if (onDataLoaded) onDataLoaded(resData);
+            })
+            .catch(err => setError(err.message))
+            .finally(() => setLoading(false));
+    }, [city, targetDate]);
+
+    if (loading) {
+        return (
+            <div className="glass-panel p-8 rounded-3xl border border-[var(--veridian-accent)]/20 mt-8 flex justify-center py-12 relative overflow-hidden">
+                <div className="absolute inset-0 opacity-5">
+                    <div className="absolute inset-0" style={{
+                        backgroundImage: `repeating-linear-gradient(90deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px),
+                            repeating-linear-gradient(0deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px)`
+                    }} />
+                </div>
+                <div className="w-8 h-8 border-2 border-[var(--veridian-accent)]/30 border-t-[var(--veridian-accent)] rounded-full animate-spin relative z-10" />
+            </div>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <div className="glass-panel p-8 rounded-3xl border border-red-500/20 mt-8 flex items-center gap-3 text-red-400">
+                <AlertCircle size={20} />
+                <p>Trajectory Vector Unavailable: {error || "No data"}</p>
+            </div>
+        );
+    }
+
+    // Prepare chart data combining baseline and predicted
+    const chartData = [];
+    const baselineLen = data.baseline_aqi.length;
+
+    // Add baseline
+    for (let i = 0; i < baselineLen; i++) {
+        chartData.push({
+            day: `Day -${baselineLen - i}`,
+            actual: data.baseline_aqi[i],
+            predicted: null,
+            isForecast: false
+        });
+    }
+
+    // Connect actual to predicted
+    if (baselineLen > 0) {
+        const lastActual = data.baseline_aqi[baselineLen - 1];
+
+        // Add predicted
+        for (let i = 0; i < data.predicted_aqi.length; i++) {
+            chartData.push({
+                day: `Day +${i + 1}`,
+                actual: i === 0 ? lastActual : null, // Connect the lines
+                predicted: data.predicted_aqi[i],
+                isForecast: true
+            });
+        }
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-panel rounded-3xl p-8 border border-[var(--veridian-accent)]/30 relative overflow-hidden mt-8"
+        >
+            <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: `repeating-linear-gradient(90deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px),
+                        repeating-linear-gradient(0deg, var(--veridian-primary) 0px, transparent 1px, transparent 30px)`
+                }} />
+            </div>
+
+            <div className="relative z-10">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-[var(--veridian-accent)]/20 flex items-center justify-center">
+                                <GitMerge size={20} className="text-[var(--veridian-accent)]" />
+                            </div>
+                            <h3 className="text-xl font-bold">T-SMART: Trajectory Vector</h3>
+                        </div>
+                        <p className="text-foreground/50 text-sm max-w-2xl pl-13">
+                            <span className="text-[var(--veridian-accent)] font-medium">Module 2 (Adaptive Brain):</span> Uses Dynamic Time Warping (DTW)
+                            to match the exact shape of the last 14 days against 10 years of history, deriving the most statistically probable momentum drift.
+                        </p>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-end min-w-[160px]">
+                        <p className="text-xs text-foreground/40 uppercase tracking-wider mb-1">Drift Velocity (Δd)</p>
+                        <div className="flex items-center gap-2">
+                            {data.drift_velocity > 0 ? (
+                                <ArrowUpRight className="text-red-400" size={20} />
+                            ) : data.drift_velocity < 0 ? (
+                                <ArrowDownRight className="text-blue-400" size={20} />
+                            ) : (
+                                <Minus className="text-foreground/40" size={20} />
+                            )}
+                            <span className={`text-2xl font-bold ${data.drift_velocity > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                                {data.drift_velocity > 0 ? '+' : ''}{data.drift_velocity}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Trajectory Chart */}
+                <div className="h-[250px] w-full mt-8 mb-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis
+                                dataKey="day"
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                minTickGap={20}
+                            />
+                            <YAxis
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#1a2012', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                itemStyle={{ color: '#fff' }}
+                            />
+                            <ReferenceLine x="Day +1" stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+                            <Line
+                                type="monotone"
+                                dataKey="actual"
+                                stroke="var(--veridian-primary)"
+                                strokeWidth={3}
+                                dot={false}
+                                name="14-Day Baseline"
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="predicted"
+                                stroke="var(--veridian-accent)"
+                                strokeWidth={3}
+                                strokeDasharray="5 5"
+                                dot={{ r: 4, fill: "var(--veridian-accent)", strokeWidth: 0 }}
+                                name="Predicted Trajectory"
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Top Historical Matches */}
+                <div>
+                    <p className="text-sm font-bold mb-4 flex items-center gap-2">
+                        <Database size={14} className="text-[var(--veridian-primary)]" />
+                        Top Historical DTW Matches
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {data.historical_matches?.map((match: any, idx: number) => (
+                            <div key={idx} className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col justify-between">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs text-foreground/40 font-mono">Rank #{idx + 1}</span>
+                                    <span className="text-[10px] uppercase font-bold text-[var(--veridian-primary)] bg-[var(--veridian-primary)]/10 px-2 py-0.5 rounded-full">
+                                        Dist: {match.distance}
+                                    </span>
+                                </div>
+                                <p className="font-bold text-sm">
+                                    {new Date(match.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <span className="text-foreground/30 mx-2">to</span>
+                                    {new Date(match.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    );
+}
+
+/* =========================================== */
+/*  Module 3: Intensity Index & Surge Overlay  */
+/* =========================================== */
+function Module3SurgeOverlay({ result }: { result: PredictionResult }) {
+    if (!result.forecast_7_day || result.forecast_7_day.length === 0) return null;
+
+    return (
+        <div className="glass-panel rounded-3xl p-8 mt-8 border border-red-500/20 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: `repeating-linear-gradient(45deg, var(--veridian-accent) 0px, transparent 1px, transparent 10px)`
+                }} />
+            </div>
+
+            <div className="relative z-10">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                                <Activity size={20} className="text-red-400" />
+                            </div>
+                            <h3 className="text-xl font-bold">T-SMART: Intensity Index & Surge Overlay</h3>
+                        </div>
+                        <p className="text-foreground/50 text-sm max-w-2xl pl-13">
+                            <span className="text-red-400 font-medium">Module 3 (Impact Logic):</span> Analyzed the highest 10-year historically recorded peaks for this specific time of year (valuing recent years 20% more). The resulting <strong>Intensity Value ({result.intensity_index.value.toFixed(1)})</strong> is overlaid as a 7-day Gaussian surge on top of the baseline forecast.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="h-[250px] w-full mt-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={result.forecast_7_day} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="surgeGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
+                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                tickFormatter={(val) => {
+                                    const d = new Date(val);
+                                    return `${d.getMonth() + 1}/${d.getDate()}`;
+                                }}
+                            />
+                            <YAxis
+                                stroke="rgba(255,255,255,0.2)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#1a2012', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                itemStyle={{ color: '#fff' }}
+                                labelFormatter={(label) => new Date(label as string).toLocaleDateString()}
+                            />
+                            <ReferenceLine x={result.prediction.date} stroke="rgba(255,255,255,0.4)" strokeDasharray="3 3" label={{ position: 'top', value: 'Anchor Date', fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+                            <Area type="monotone" dataKey="baseline" stackId="1" stroke="var(--veridian-primary)" fill="var(--veridian-primary)" fillOpacity={0.2} name="WPHA Baseline" />
+                            <Area type="monotone" dataKey="surge_magnitude" stackId="1" stroke="#ef4444" fill="url(#surgeGradient)" name="Surge Overlay" />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* =========================================== */
+/*  Module 4: The Insight Engine               */
+/* =========================================== */
+function ResearchInsightCard({ result, trajectory }: { result: PredictionResult, trajectory: any }) {
+    const [insight, setInsight] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!result || !trajectory) return;
+        setLoading(true);
+        fetch("http://127.0.0.1:8000/tsmart/insights", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                drift_velocity: trajectory.drift_velocity,
+                intensity_index: result.intensity_index.value,
+                historical_mean: result.prediction.aqi_stats?.mean || 0,
+                centroid_dates: trajectory.historical_matches.map((m: any) => m.end_date),
+                target_date: result.prediction.date,
+                city: result.prediction.city
+            })
+        })
+            .then(res => res.json())
+            .then(data => setInsight(data))
+            .catch(err => console.error("Failed to generate insights", err))
+            .finally(() => setLoading(false));
+    }, [result, trajectory]);
+
+    if (!insight) return null;
+
+    return (
+        <div className="glass-panel p-8 rounded-3xl border border-blue-500/30 mt-8 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-5" style={{ backgroundColor: "#3b82f6" }} />
+
+            <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                        <Layers size={20} className="text-blue-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-bold flex items-center gap-3">
+                            Insight Engine
+                            <span className="text-sm font-normal py-1 px-3 bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">
+                                {insight.trajectory_name}
+                            </span>
+                        </h3>
+                    </div>
+                </div>
+
+                <p className="text-foreground/80 text-lg leading-relaxed mb-6 font-medium pl-13">
+                    {insight.drift_summary}
+                </p>
+
+                <div className="flex flex-col md:flex-row gap-6 mt-8">
+                    <div className="flex-1 bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col items-center justify-center">
+                        <div className="text-sm text-foreground/50 uppercase tracking-widest font-bold mb-2">Engine Confidence</div>
+                        <div className="text-5xl font-black text-blue-400">{insight.confidence_score}</div>
+                    </div>
+
+                    <div className="flex-[2] bg-white/5 p-6 rounded-2xl border border-white/10 overflow-x-auto">
+                        <div className="text-sm text-foreground/50 uppercase tracking-widest font-bold mb-4">Historical Reference Table</div>
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="text-foreground/40 text-xs uppercase border-b border-white/10">
+                                    <th className="pb-3 pl-2">Pattern Match</th>
+                                    <th className="pb-3">DTW Distance</th>
+                                    <th className="pb-3 text-right pr-2">Historical Drift</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {trajectory.historical_matches.slice(0, 3).map((match: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                                        <td className="py-3 pl-2 font-mono text-sm">{match.start_date} <span className="text-foreground/30 px-1">to</span> {match.end_date}</td>
+                                        <td className="py-3 font-mono text-blue-400">{match.distance.toFixed(2)}</td>
+                                        <td className="py-3 text-right pr-2">{trajectory.drift_velocity > 0 ? "+" : ""}{trajectory.drift_velocity.toFixed(1)}d</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
