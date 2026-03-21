@@ -30,12 +30,35 @@ class MetaEnsembleOrchestrator:
         self.lstm = LSTMBaseModel()
         self.cnn = CNNBaseModel()
         self.meta_learner = RFMetaLearner()
+        # Ensure path for storing/loading data
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.processed_data_dir = os.path.join(current_dir, "processed_data")
 
     def predict(self, enriched_data=None, historical_mean: float = 140.0):
+        # Retrieve a live (simulated) 3D tensor sequence if None
+        if enriched_data is None:
+            try:
+                import numpy as np
+                test_file = os.path.join(self.processed_data_dir, "X_test.npy")
+                x_sample = np.load(test_file)[0:1] # shape (1, 7, 21)
+            except Exception:
+                x_sample = None
+        else:
+            x_sample = enriched_data
+
         # 1. Base models predict in parallel (stubbed as sequential here)
         xgb_pred = self.xgb.predict(enriched_data)
-        lstm_pred = self.lstm.predict(enriched_data)
-        cnn_pred = self.cnn.predict(enriched_data)
+        lstm_pred_scaled = self.lstm.predict(x_sample) if x_sample is not None else 0.5
+        cnn_pred_scaled = self.cnn.predict(x_sample) if x_sample is not None else 0.5
+        
+        # Inverse transform the scaled predictions to real AQI space
+        try:
+            from logic_layer import inverse_transform_aqi
+        except ImportError:
+            from ml_engine.logic_layer import inverse_transform_aqi
+            
+        lstm_pred = inverse_transform_aqi(lstm_pred_scaled)
+        cnn_pred = inverse_transform_aqi(cnn_pred_scaled)
 
         # 2. Consolidate results
         meta_input = [xgb_pred, lstm_pred, cnn_pred]
@@ -46,10 +69,14 @@ class MetaEnsembleOrchestrator:
         # 4. Logic Layer categorization
         category = get_cpcb_category(consensus_aqi)
         trend = calculate_aqi_trend(consensus_aqi, historical_mean)
+        
+        # 5. Model Contributions
+        contributions = self.meta_learner.get_contributions()
 
         return {
             "aqi": round(consensus_aqi, 2),
             "category": category,
             "trend": trend,
-            "confidence": 88.5
+            "confidence": 88.5,
+            "model_contributions": contributions
         }

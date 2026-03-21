@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, ArrowRight, Layers } from "lucide-react";
 import { getAqiCategoryInfo } from "./PredictionGrid";
@@ -9,6 +11,19 @@ interface UnifiedResultCardProps {
 }
 
 export default function UnifiedResultCard({ data, loading }: UnifiedResultCardProps) {
+    const aqi = data?.aqi || 0;
+    const contributions = data?.model_contributions;
+
+    // Hooks must come before any early returns (Rules of Hooks)
+    useEffect(() => {
+        if (contributions) {
+            console.log("=== META-ENSEMBLE MODEL TRUST CONTRIBUTIONS ===");
+            console.log(`XGBoost (Tabular Proxy): ${(contributions.XGB * 100).toFixed(1)}%`);
+            console.log(`LSTM (Long-term Temporal): ${(contributions.LSTM * 100).toFixed(1)}%`);
+            console.log(`1D-CNN (Local Shocks): ${(contributions.CNN * 100).toFixed(1)}%`);
+        }
+    }, [contributions]);
+
     if (!loading && !data) return null;
 
     if (loading) {
@@ -26,9 +41,9 @@ export default function UnifiedResultCard({ data, loading }: UnifiedResultCardPr
         );
     }
 
-    const aqi = data?.aqi || 0;
     const { category, color } = getAqiCategoryInfo(aqi);
     const trend = data?.trend || "Stable";
+
 
     const renderTrendIcon = () => {
         if (trend === "Deteriorating") return <ArrowUpRight className="text-red-400" size={24} />;
@@ -81,9 +96,16 @@ export default function UnifiedResultCard({ data, loading }: UnifiedResultCardPr
             </div>
 
             <div className="mt-10 pt-5 border-t border-[#889063]/30 text-center">
-                <p className="text-[#E5D7C4]/50 text-xs tracking-widest uppercase mb-1">
+                <p className="text-[#E5D7C4]/50 text-xs tracking-widest uppercase mb-3">
                     Unified consensus of XGBoost, LSTM, and 1D-CNN predictive streams
                 </p>
+                {contributions && (
+                    <div className="flex justify-center items-center gap-6 text-[#E5D7C4]/60 text-xs tracking-wider">
+                        <span title="XGBoost Trust Weight">XGB: {(contributions.XGB * 100).toFixed(1)}%</span>
+                        <span title="LSTM Trust Weight">LSTM: {(contributions.LSTM * 100).toFixed(1)}%</span>
+                        <span title="1D-CNN Trust Weight">CNN: {(contributions.CNN * 100).toFixed(1)}%</span>
+                    </div>
+                )}
             </div>
         </motion.div>
     );
