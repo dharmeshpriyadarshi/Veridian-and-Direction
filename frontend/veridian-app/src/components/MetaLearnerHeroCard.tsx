@@ -180,6 +180,14 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                                 {(["xgb", "lstm", "cnn"] as const).map((key) => {
                                     const pct = ((weights?.[key] ?? 0) * 100);
                                     const meta = MODEL_META[key];
+
+                                    // Hard-coded colors as requested
+                                    const bgColors: Record<string, string> = {
+                                        "xgb": "#3b82f6", // Deep Blue
+                                        "lstm": "#22c55e", // Veridian Green
+                                        "cnn": "#f59e0b" // Amber/Orange
+                                    };
+
                                     return (
                                         <div key={key}>
                                             <div className="flex justify-between text-[11px] mb-1">
@@ -191,7 +199,8 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${pct}%` }}
                                                     transition={{ duration: 0.7, ease: "easeOut" }}
-                                                    className={`h-full rounded-full ${meta.color}/70`}
+                                                    className="h-full rounded-full"
+                                                    style={{ backgroundColor: bgColors[key] }}
                                                 />
                                             </div>
                                             <p className="text-[#E5D7C4]/30 text-[10px] mt-0.5">{meta.desc}</p>

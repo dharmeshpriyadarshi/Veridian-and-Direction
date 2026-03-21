@@ -246,9 +246,9 @@ export default function LittleAheadPage() {
                     selectedCity={selectedCity}
                 />
 
-                {/* BASE METHOD CARDS — Methods 5 & 6 (last in 3×2 grid) */}
+                {/* BASE METHOD CARDS — Methods 5 & 6 (Full Width Stacked) */}
                 {(loading || metaResult) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                    <div className="flex flex-col gap-6 mb-6">
                         <MethodCard
                             methodNumber={5}
                             title="LSTM"
@@ -271,6 +271,22 @@ export default function LittleAheadPage() {
                         />
                     </div>
                 )}
+
+                {/* ============================================ */}
+                {/*  PREDICTION GRID (METHODS 1 & 2 - MASKED)    */}
+                {/* ============================================ */}
+                {/* 
+                <PredictionGrid
+                    result={result}
+                    tsmartResult={tsmartResult}
+                    sarimaxResult={sarimaxResult}
+                    xgboostResult={xgboostResult}
+                    xgbShapResult={xgbShapResult}
+                    xgbPerfResult={xgbPerfResult}
+                    selectedDate={selectedDate}
+                    selectedCity={selectedCity}
+                />
+                */}
 
                 {/* ============================================ */}
                 {/*  EMPTY STATE                                 */}

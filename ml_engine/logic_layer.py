@@ -70,10 +70,10 @@ def get_neural_insight_object(model_key: str, aqi_pred: float = 0.0) -> dict:
     import random, math
     if model_key == "lstm":
         return {
-            "memory_window":         "168 Hours (7 Days)",
-            "temporal_decay_rate":   f"{round(0.12 + (aqi_pred % 10) * 0.005, 4)}",
-            "recursive_steps":       "7 Unrolled LSTM Cells",
-            "cell_state_magnitude":  f"{round(abs(math.sin(aqi_pred / 100)) * 0.85 + 0.1, 3)}",
+            "Sequence Window":         "168h",
+            "Temporal Weighting":      f"{round(0.12 + (aqi_pred % 10) * 0.005, 4)}",
+            "Memory Depth":            "7 Unrolled LSTM Cells",
+            "Recursive Stability":     f"{round(abs(math.sin(aqi_pred / 100)) * 0.85 + 0.1, 3)}",
         }
     elif model_key == "cnn":
         intensity_map = { "Good": "Low", "Satisfactory": "Low-Medium",
@@ -81,10 +81,10 @@ def get_neural_insight_object(model_key: str, aqi_pred: float = 0.0) -> dict:
                           "Very Poor": "Very High", "Severe": "Critical" }
         cat = get_cpcb_category(aqi_pred)
         return {
-            "pattern_match_score":  f"{round(min(aqi_pred / 500 * 100, 99), 1)}%",
-            "active_filter_name":   "Conv1D-64 Spike Detector",
-            "shock_intensity":      intensity_map.get(cat, "High"),
-            "kernel_window":        "2-Day Receptive Field",
+            "Pattern Sharpness":           f"{round(min(aqi_pred / 500 * 100, 99), 1)}%",
+            "Signal Match %":              f"{round(min(aqi_pred / 400 * 100, 98), 1)}%",
+            "Filter Activation (Inversion)": "Conv1D-no_inv",
+            "Shock Detection Intensity":   intensity_map.get(cat, "High"),
         }
     elif model_key == "xgb":
         return {
