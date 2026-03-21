@@ -19,9 +19,9 @@ except ImportError:
     from ml_engine.models.rf_meta_learner import RFMetaLearner
 
 try:
-    from logic_layer import get_cpcb_category, calculate_aqi_trend, get_derived_insights
+    from logic_layer import get_cpcb_category, calculate_aqi_trend, get_derived_insights, get_neural_insight_object
 except ImportError:
-    from ml_engine.logic_layer import get_cpcb_category, calculate_aqi_trend, get_derived_insights
+    from ml_engine.logic_layer import get_cpcb_category, calculate_aqi_trend, get_derived_insights, get_neural_insight_object
 
 
 class MetaEnsembleOrchestrator:
@@ -92,9 +92,21 @@ class MetaEnsembleOrchestrator:
             "confidence": 88.5,
             "model_contributions": contributions,
             "weights": weights,
+            # Task 3 audit: verify xgb_pred is at index 0 of meta_input
+            "meta_input_audit": {
+                "index_0_xgb": round(xgb_pred,  2),
+                "index_1_lstm": round(lstm_pred, 2),
+                "index_2_cnn":  round(cnn_pred,  2),
+            },
             "insights": {
                 "xgb":  get_derived_insights("xgb"),
                 "lstm": get_derived_insights("lstm"),
                 "cnn":  get_derived_insights("cnn"),
+            },
+            # Rich Neural Insight Objects for frontend Stat Block grid
+            "neural_insights": {
+                "xgb":  get_neural_insight_object("xgb",  xgb_pred),
+                "lstm": get_neural_insight_object("lstm", lstm_pred),
+                "cnn":  get_neural_insight_object("cnn",  cnn_pred),
             }
         }

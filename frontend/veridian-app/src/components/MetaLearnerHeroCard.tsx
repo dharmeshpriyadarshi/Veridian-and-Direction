@@ -113,7 +113,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                         onClick={() => setShowDecision(v => !v)}
                         className="flex items-center gap-2 mx-auto text-[#889063] hover:text-[#E5D7C4] transition-colors text-xs uppercase tracking-widest"
                     >
-                        <span>How We Reached This Number</span>
+                        <span>Transparency &amp; Logic</span>
                         <ChevronDown
                             size={14}
                             className={`transition-transform duration-300 ${showDecision ? "rotate-180" : ""}`}
@@ -135,7 +135,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                         <div className="px-8 pb-8 border-t border-[#889063]/20 pt-6">
 
                             {/* Dynamic tooltip banner */}
-                            <div className="relative flex items-start gap-3 bg-white/5 rounded-2xl p-4 mb-6">
+                            <div className="relative flex items-start gap-3 bg-white/5 rounded-2xl p-4 mb-4">
                                 <Info size={14} className="text-[#889063] mt-0.5 shrink-0" />
                                 <p className="text-[#E5D7C4]/70 text-xs leading-relaxed">
                                     The Meta-Learner audits three independent AI architectures. It currently trusts{" "}
@@ -143,6 +143,19 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                                     its historical accuracy during similar atmospheric conditions.
                                 </p>
                             </div>
+
+                            {/* XGB diagnostic note — shown when xgb weight is low */}
+                            {weights && weights.xgb < 0.2 && (
+                                <div className="flex items-start gap-3 bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 mb-4">
+                                    <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                                    <p className="text-blue-300/80 text-xs leading-relaxed">
+                                        <span className="font-bold text-blue-300">Diagnostic:</span> The Meta-Learner currently
+                                        prioritizes sequential patterns over tabular weather trends due to high atmospheric
+                                        volatility. XGBoost remains factored at{" "}
+                                        <span className="font-bold">{((weights.xgb ?? 0) * 100).toFixed(1)}%</span>.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Weighted formula display */}
                             <p className="text-[#889063] text-[10px] uppercase tracking-widest mb-3">

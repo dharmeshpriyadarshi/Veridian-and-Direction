@@ -248,7 +248,7 @@ export default function LittleAheadPage() {
 
                 {/* BASE METHOD CARDS — Methods 5 & 6 (last in 3×2 grid) */}
                 {(loading || metaResult) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                         <MethodCard
                             methodNumber={5}
                             title="LSTM"
@@ -256,6 +256,7 @@ export default function LittleAheadPage() {
                             aqi={metaResult?.lstm_aqi ?? null}
                             trend={metaResult?.trend ?? null}
                             insight={metaResult?.insights?.lstm ?? null}
+                            neuralInsights={metaResult?.neural_insights?.lstm ?? null}
                             loading={loading}
                         />
                         <MethodCard
@@ -265,6 +266,7 @@ export default function LittleAheadPage() {
                             aqi={metaResult?.cnn_aqi ?? null}
                             trend={metaResult?.trend ?? null}
                             insight={metaResult?.insights?.cnn ?? null}
+                            neuralInsights={metaResult?.neural_insights?.cnn ?? null}
                             loading={loading}
                         />
                     </div>
