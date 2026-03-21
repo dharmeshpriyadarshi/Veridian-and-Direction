@@ -7,6 +7,7 @@ import {
     Search, Calendar, AlertCircle, ChevronDown, Cpu, MapPin
 } from "lucide-react";
 import PredictionGrid, { PredictionResult } from "@/components/PredictionGrid";
+import UnifiedResultCard from "@/components/UnifiedResultCard";
 
 /* =========================================== */
 /*  Main Page Component                        */
@@ -22,6 +23,7 @@ export default function LittleAheadPage() {
     const [xgboostResult, setXgboostResult] = useState<any>(null);
     const [xgbShapResult, setXgbShapResult] = useState<any>(null);
     const [xgbPerfResult, setXgbPerfResult] = useState<any>(null);
+    const [metaResult, setMetaResult] = useState<any>(null);
     const [trajectoryData, setTrajectoryData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -50,16 +52,17 @@ export default function LittleAheadPage() {
         setXgboostResult(null);
         setXgbShapResult(null);
         setXgbPerfResult(null);
-        setXgbPerfResult(null);
+        setMetaResult(null);
 
         try {
-            const [anchorRes, tsmartRes, sarimaxRes, xgboostRes, shapRes, perfRes] = await Promise.all([
+            const [anchorRes, tsmartRes, sarimaxRes, xgboostRes, shapRes, perfRes, metaRes] = await Promise.all([
                 fetch(`http://127.0.0.1:8000/predict-anchor?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`),
                 fetch(`http://127.0.0.1:8000/predict/tsmart?target_date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`, { method: "POST" }).catch(() => null),
                 fetch(`http://127.0.0.1:8000/predict/sarimax?target_date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`, { method: "POST" }).catch(() => null),
                 fetch(`http://127.0.0.1:8000/predict/xgboost?city=${encodeURIComponent(selectedCity)}`).catch(() => null),
                 fetch(`http://127.0.0.1:8000/predict/xgboost/shap?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`).catch(() => null),
-                fetch(`http://127.0.0.1:8000/model/xgboost/performance`).catch(() => null)
+                fetch(`http://127.0.0.1:8000/model/xgboost/performance`).catch(() => null),
+                fetch(`http://127.0.0.1:8000/api/v1/predict/meta-ensemble?date=${selectedDate}&city=${encodeURIComponent(selectedCity)}`).catch(() => null)
             ]);
 
             if (!anchorRes.ok) {
@@ -93,6 +96,10 @@ export default function LittleAheadPage() {
             if (perfRes && perfRes.ok) {
                 const perfData = await perfRes.json();
                 setXgbPerfResult(perfData);
+            }
+            if (metaRes && metaRes.ok) {
+                const mData = await metaRes.json();
+                setMetaResult(mData);
             }
         } catch (err: any) {
             setError(err.message || "Could not connect to the ML Engine. Is the API running?");
@@ -221,6 +228,12 @@ export default function LittleAheadPage() {
                 {/* ============================================ */}
                 {/*  PREDICTION RESULT                           */}
                 {/* ============================================ */}
+
+                {/* META-ENSEMBLE RESULT */}
+                {(loading || metaResult) && (
+                    <UnifiedResultCard data={metaResult} loading={loading} />
+                )}
+
                 <PredictionGrid
                     result={result}
                     tsmartResult={tsmartResult}
