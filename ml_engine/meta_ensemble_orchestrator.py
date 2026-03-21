@@ -73,10 +73,22 @@ class MetaEnsembleOrchestrator:
         # 5. Model Contributions
         contributions = self.meta_learner.get_contributions()
 
+        # 6. Build weights dict from contributions
+        weights = {
+            "xgb": round(contributions.get("XGB", 0.33), 4),
+            "lstm": round(contributions.get("LSTM", 0.33), 4),
+            "cnn": round(contributions.get("CNN", 0.33), 4),
+        }
+
         return {
+            "meta_aqi": round(consensus_aqi, 2),
+            # Legacy key kept for backward compat
             "aqi": round(consensus_aqi, 2),
+            "lstm_aqi": round(lstm_pred, 2),
+            "cnn_aqi": round(cnn_pred, 2),
             "category": category,
             "trend": trend,
             "confidence": 88.5,
-            "model_contributions": contributions
+            "model_contributions": contributions,
+            "weights": weights
         }
