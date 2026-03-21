@@ -1084,3 +1084,29 @@ def get_xgboost_shap(city: str = "Delhi", date: str = "2026-06-15"):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# NEW: MODEL 5 META-ENSEMBLE ENDPOINT
+# =====================================================
+@app.get("/api/v1/predict/meta-ensemble")
+async def get_meta_ensemble_prediction(city: str = "Delhi", date: str = None):
+    """
+    Returns a unified JSON payload representing the consensus prediction
+    from the Meta-Ensemble Stacking Architecture.
+    """
+    try:
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(current_dir)
+        if root_dir not in sys.path:
+            sys.path.append(root_dir)
+            
+        from ml_engine.meta_ensemble_orchestrator import MetaEnsembleOrchestrator
+        orchestrator = MetaEnsembleOrchestrator()
+        result = orchestrator.predict(enriched_data=None)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
