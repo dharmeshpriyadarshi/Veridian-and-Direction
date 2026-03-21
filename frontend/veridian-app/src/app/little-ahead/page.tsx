@@ -235,28 +235,6 @@ export default function LittleAheadPage() {
                     <MetaLearnerHeroCard data={metaResult} loading={loading} />
                 )}
 
-                {/* BASE METHOD CARDS — Methods 5 & 6 */}
-                {(loading || metaResult) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                        <MethodCard
-                            methodNumber={5}
-                            title="LSTM"
-                            subtitle="Long-Term Temporal Memory"
-                            aqi={metaResult?.lstm_aqi ?? null}
-                            trend={metaResult?.trend ?? null}
-                            loading={loading}
-                        />
-                        <MethodCard
-                            methodNumber={6}
-                            title="1D-CNN"
-                            subtitle="Localized Pattern Recognition"
-                            aqi={metaResult?.cnn_aqi ?? null}
-                            trend={metaResult?.trend ?? null}
-                            loading={loading}
-                        />
-                    </div>
-                )}
-
                 <PredictionGrid
                     result={result}
                     tsmartResult={tsmartResult}
@@ -267,6 +245,30 @@ export default function LittleAheadPage() {
                     selectedDate={selectedDate}
                     selectedCity={selectedCity}
                 />
+
+                {/* BASE METHOD CARDS — Methods 5 & 6 (last in 3×2 grid) */}
+                {(loading || metaResult) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        <MethodCard
+                            methodNumber={5}
+                            title="LSTM"
+                            subtitle="Long-Term Temporal Memory"
+                            aqi={metaResult?.lstm_aqi ?? null}
+                            trend={metaResult?.trend ?? null}
+                            insight={metaResult?.insights?.lstm ?? null}
+                            loading={loading}
+                        />
+                        <MethodCard
+                            methodNumber={6}
+                            title="1D-CNN"
+                            subtitle="Localized Pattern Recognition"
+                            aqi={metaResult?.cnn_aqi ?? null}
+                            trend={metaResult?.trend ?? null}
+                            insight={metaResult?.insights?.cnn ?? null}
+                            loading={loading}
+                        />
+                    </div>
+                )}
 
                 {/* ============================================ */}
                 {/*  EMPTY STATE                                 */}

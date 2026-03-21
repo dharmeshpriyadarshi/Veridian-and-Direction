@@ -28,7 +28,8 @@ def main():
     cnn_preds_scaled = cnn.model.predict(X_test, verbose=0)
     
     for i in range(len(X_test)):
-        p_xgb = xgb.predict(None)
+        x_i = X_test[i:i+1]
+        p_xgb = xgb.predict(x_i)
         
         p_lstm = inverse_transform_aqi(float(lstm_preds_scaled[i][0]))
         p_cnn = inverse_transform_aqi(float(cnn_preds_scaled[i][0]))

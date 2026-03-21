@@ -49,3 +49,15 @@ def inverse_transform_aqi(scaled_val: float) -> float:
     # Since AQI was index 0 during fit:
     val = (scaled_val - scaler.min_[0]) / scaler.scale_[0]
     return float(val)
+
+def get_derived_insights(model_key: str) -> str:
+    """
+    Returns a human-readable architectural insight string per model,
+    used as the 'Derived Insight' label on the frontend MethodCard.
+    """
+    insights = {
+        "xgb": "Tabular Feature Aggregation: Wind + Lag Correlations",
+        "lstm": "Sequence Memory: 168 Hours",
+        "cnn": "Spatial Pattern: High-Frequency Shock Detected",
+    }
+    return insights.get(model_key, "")

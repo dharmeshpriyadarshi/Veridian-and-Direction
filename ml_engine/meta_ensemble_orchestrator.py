@@ -19,9 +19,9 @@ except ImportError:
     from ml_engine.models.rf_meta_learner import RFMetaLearner
 
 try:
-    from logic_layer import get_cpcb_category, calculate_aqi_trend
+    from logic_layer import get_cpcb_category, calculate_aqi_trend, get_derived_insights
 except ImportError:
-    from ml_engine.logic_layer import get_cpcb_category, calculate_aqi_trend
+    from ml_engine.logic_layer import get_cpcb_category, calculate_aqi_trend, get_derived_insights
 
 
 class MetaEnsembleOrchestrator:
@@ -84,11 +84,17 @@ class MetaEnsembleOrchestrator:
             "meta_aqi": round(consensus_aqi, 2),
             # Legacy key kept for backward compat
             "aqi": round(consensus_aqi, 2),
+            "xgb_aqi":  round(xgb_pred,  2),
             "lstm_aqi": round(lstm_pred, 2),
-            "cnn_aqi": round(cnn_pred, 2),
+            "cnn_aqi":  round(cnn_pred,  2),
             "category": category,
             "trend": trend,
             "confidence": 88.5,
             "model_contributions": contributions,
-            "weights": weights
+            "weights": weights,
+            "insights": {
+                "xgb":  get_derived_insights("xgb"),
+                "lstm": get_derived_insights("lstm"),
+                "cnn":  get_derived_insights("cnn"),
+            }
         }

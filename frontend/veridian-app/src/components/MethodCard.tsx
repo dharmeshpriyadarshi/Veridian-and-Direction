@@ -10,10 +10,11 @@ interface MethodCardProps {
     subtitle: string;
     aqi: number | null;
     trend?: string | null;
+    insight?: string | null;
     loading?: boolean;
 }
 
-export default function MethodCard({ methodNumber, title, subtitle, aqi, trend, loading }: MethodCardProps) {
+export default function MethodCard({ methodNumber, title, subtitle, aqi, trend, insight, loading }: MethodCardProps) {
     // Hooks must be unconditionally called before early returns
     const { category, color } = getAqiCategoryInfo(aqi ?? 0);
 
@@ -67,6 +68,13 @@ export default function MethodCard({ methodNumber, title, subtitle, aqi, trend, 
             {trend && (
                 <p className={`text-xs uppercase tracking-widest font-medium ${trendColor}`}>
                     {trend}
+                </p>
+            )}
+
+            {/* Derived insight */}
+            {insight && (
+                <p className="text-[#E5D7C4]/30 text-[10px] italic leading-snug border-t border-[#889063]/20 pt-2">
+                    {insight}
                 </p>
             )}
         </motion.div>
