@@ -41,3 +41,10 @@ backend/.venv/
 # Ignore trained models
 models/
 *.pkl
+*.keras
+*.npy
+
+# ML artifacts
+ml_engine/processed_data/
+ml_engine/saved_models/
+
