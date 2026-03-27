@@ -19,13 +19,14 @@ export default function LittleAheadPage() {
     const [selectedCity, setSelectedCity] = useState("Delhi");
     const [cities, setCities] = useState<string[]>([]);
     const [result, setResult] = useState<PredictionResult | null>(null);
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const [tsmartResult, setTsmartResult] = useState<any>(null);
     const [sarimaxResult, setSarimaxResult] = useState<any>(null);
     const [xgboostResult, setXgboostResult] = useState<any>(null);
     const [xgbShapResult, setXgbShapResult] = useState<any>(null);
     const [xgbPerfResult, setXgbPerfResult] = useState<any>(null);
     const [metaResult, setMetaResult] = useState<any>(null);
-    const [trajectoryData, setTrajectoryData] = useState<any>(null);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -83,6 +84,7 @@ export default function LittleAheadPage() {
             }
             if (xgboostRes && xgboostRes.ok) {
                 const xData = await xgboostRes.json();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const match = xData.timeseries?.find((t: any) => t.date === selectedDate);
                 if (match) {
                     setXgboostResult({ ...xData, predicted_aqi: match.predicted_aqi });
@@ -102,8 +104,8 @@ export default function LittleAheadPage() {
                 const mData = await metaRes.json();
                 setMetaResult(mData);
             }
-        } catch (err: any) {
-            setError(err.message || "Could not connect to the ML Engine. Is the API running?");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Could not connect to the ML Engine. Is the API running?");
         } finally {
             setLoading(false);
         }

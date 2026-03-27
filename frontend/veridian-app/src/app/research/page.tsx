@@ -1226,7 +1226,7 @@ export default function ResearchPage() {
                                                         <Activity size={32} className="text-white/40 mb-4" />
                                                         <h3 className="text-lg font-bold mb-2">Atmospheric Memory</h3>
                                                         <p className="text-sm text-white/50 mb-8 max-w-[250px]">
-                                                            The Auto-Regressive (AR) coefficient. A higher value means today's pollution is heavily dependent on yesterday's baseline.
+                                                            The Auto-Regressive (AR) coefficient. A higher value means today&apos;s pollution is heavily dependent on yesterday&apos;s baseline.
                                                         </p>
 
                                                         <div className="relative w-40 h-40 flex items-center justify-center">
@@ -1656,12 +1656,15 @@ function HistoricalDriftTable({ defaultCity = "Delhi", defaultMonth = 1 }: { def
 
     // Sync state when props change
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (defaultCity) setSelectedCity(defaultCity);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (defaultMonth) setSelectedMonth(defaultMonth);
     }, [defaultCity, defaultMonth]);
 
     // Load spikes when city changes
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         fetch(`http://127.0.0.1:8000/tsmart/historical_spikes?city=${encodeURIComponent(selectedCity)}`)
             .then(res => res.json())
@@ -1845,6 +1848,7 @@ function TrajectoryVector({ city, targetDate, onDataLoaded }: { city: string; ta
 
     useEffect(() => {
         if (!city || !targetDate) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         setError("");
         fetch(`http://127.0.0.1:8000/tsmart/trajectory_vector?city=${encodeURIComponent(city)}&target_date=${encodeURIComponent(targetDate)}`)
@@ -2111,6 +2115,7 @@ function ResearchInsightCard({ result, trajectory }: { result: PredictionResult,
 
     useEffect(() => {
         if (!result || !trajectory) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         fetch("http://127.0.0.1:8000/tsmart/insights", {
             method: "POST",

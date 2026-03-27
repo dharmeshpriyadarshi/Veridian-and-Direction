@@ -1,0 +1,75 @@
+
+> veridian-app@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.12
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2.9s
+   Linting and checking validity of types ...
+
+./src/app/little-ahead/page.tsx
+22:5  Warning: Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any').
+87:17  Warning: Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any').
+
+./src/app/page.tsx
+5:38  Warning: 'TreePine' is defined but never used.  @typescript-eslint/no-unused-vars
+5:60  Warning: 'AlertTriangle' is defined but never used.  @typescript-eslint/no-unused-vars
+8:7  Warning: 'MotionLink' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/research/page.tsx
+6:54  Warning: 'Download' is defined but never used.  @typescript-eslint/no-unused-vars
+6:78  Warning: 'Wind' is defined but never used.  @typescript-eslint/no-unused-vars
+6:84  Warning: 'Thermometer' is defined but never used.  @typescript-eslint/no-unused-vars
+6:97  Warning: 'Droplets' is defined but never used.  @typescript-eslint/no-unused-vars
+6:212  Warning: 'ShieldCheck' is defined but never used.  @typescript-eslint/no-unused-vars
+293:8  Warning: React Hook useEffect has a missing dependency: 'fetchXgboostData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+1617:10  Warning: 'StatCard' is defined but never used.  @typescript-eslint/no-unused-vars
+1661:9  Warning: Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect').
+1866:8  Warning: React Hook useEffect has a missing dependency: 'onDataLoaded'. Either include it or remove the dependency array. If 'onDataLoaded' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+2114:12  Warning: 'loading' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/simulate/page.tsx
+7:22  Warning: 'Info' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/Map.tsx
+6:10  Warning: 'useEffect' is defined but never used.  @typescript-eslint/no-unused-vars
+6:21  Warning: 'useState' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/MetaLearnerHeroCard.tsx
+27:12  Warning: 'showTooltip' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+27:25  Warning: 'setShowTooltip' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/Navbar.tsx
+17:26  Warning: 'setIsResearcher' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/PredictionGrid.tsx
+2:15  Warning: 'BarChart3' is defined but never used.  @typescript-eslint/no-unused-vars
+2:36  Warning: 'Database' is defined but never used.  @typescript-eslint/no-unused-vars
+2:79  Warning: 'GitMerge' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/9) ...
+   Generating static pages (2/9) 
+   Generating static pages (4/9) 
+   Generating static pages (6/9) 
+ ✓ Generating static pages (9/9)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    6.36 kB         153 kB
+├ ○ /_not-found                            996 B         103 kB
+├ ○ /insights                            3.36 kB         150 kB
+├ ○ /little-ahead                         5.7 kB         158 kB
+├ ○ /research                             137 kB         289 kB
+└ ○ /simulate                            4.06 kB         150 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/255-091853b4155593e2.js       45.7 kB
+  ├ chunks/4bd1b696-409494caf8c83275.js  54.2 kB
+  └ other shared chunks (total)          2.53 kB
+
+
+○  (Static)  prerendered as static content
+
