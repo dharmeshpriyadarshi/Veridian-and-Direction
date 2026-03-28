@@ -11,8 +11,13 @@ data/processed/city_day_features.csv
 # ========================
 __pycache__/
 *.py[cod]
+
+# ========================
+# VIRTUAL ENVIRONMENTS
+# ========================
 .venv/
 venv/
+backend/.venv/
 
 # ========================
 # ENV FILES
@@ -33,18 +38,26 @@ forecast_results.csv
 historical_pm25.csv
 
 # ========================
-# VIRTUAL ENVIRONMENTS
+# ML ARTIFACTS
 # ========================
-.venv/
-backend/.venv/
-
-# Ignore trained models
-models/
+ml_engine/processed_data/
+ml_engine/saved_models/
 *.pkl
 *.keras
 *.npy
 
-# ML artifacts
-ml_engine/processed_data/
-ml_engine/saved_models/
+# Legacy model metrics (root folder only)
+/models/
+!ml_engine/models/*.py
 
+# ========================
+# LOGS
+# ========================
+logs/
+*.log
+
+# ========================
+# OS FILES
+# ========================
+.DS_Store
+Thumbs.db
