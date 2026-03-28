@@ -22,8 +22,8 @@ class RFMetaLearner:
         joblib.dump(self.model, self.model_path)
         print(f"Meta-learner saved to {self.model_path}")
 
-    def predict(self, xgb_pred, lstm_pred, cnn_pred):
-        X = np.array([[xgb_pred, lstm_pred, cnn_pred]])
+    def predict(self, xgb_pred, lstm_pred, cnn_pred, gru_pred):
+        X = np.array([[xgb_pred, lstm_pred, cnn_pred, gru_pred]])
         pred = self.model.predict(X)
         return float(pred[0])
         
@@ -31,8 +31,8 @@ class RFMetaLearner:
         """Returns the feature importances (trust weights) allocated to each model"""
         if hasattr(self.model, "feature_importances_"):
             imp = self.model.feature_importances_
-            return {"XGB": float(imp[0]), "LSTM": float(imp[1]), "CNN": float(imp[2])}
-        return {"XGB": 0.33, "LSTM": 0.33, "CNN": 0.33}
+            return {"XGB": float(imp[0]), "LSTM": float(imp[1]), "CNN": float(imp[2]), "GRU": float(imp[3])}
+        return {"XGB": 0.25, "LSTM": 0.25, "CNN": 0.25, "GRU": 0.25}
 
 if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -46,4 +46,4 @@ if __name__ == "__main__":
     learner.train(meta_X, meta_y)
     
     importances = learner.get_contributions()
-    print(f"Model Contributions - XGB: {importances['XGB']:.2f}, LSTM: {importances['LSTM']:.2f}, CNN: {importances['CNN']:.2f}")
+    print(f"Model Contributions - XGB: {importances['XGB']:.2f}, LSTM: {importances['LSTM']:.2f}, CNN: {importances['CNN']:.2f}, GRU: {importances['GRU']:.2f}")

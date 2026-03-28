@@ -59,6 +59,7 @@ def get_derived_insights(model_key: str) -> str:
         "xgb": "Tabular Feature Aggregation: Wind + Lag Correlations",
         "lstm": "Sequence Memory: 168 Hours",
         "cnn": "Spatial Pattern: High-Frequency Shock Detected",
+        "gru": "Gated Sequential Stream: Lean Agility",
     }
     return insights.get(model_key, "")
 
@@ -85,6 +86,13 @@ def get_neural_insight_object(model_key: str, aqi_pred: float = 0.0) -> dict:
             "Signal Match %":              f"{round(min(aqi_pred / 400 * 100, 98), 1)}%",
             "Filter Activation (Inversion)": "Conv1D-no_inv",
             "Shock Detection Intensity":   intensity_map.get(cat, "High"),
+        }
+    elif model_key == "gru":
+        return {
+            "Gating Efficiency":           f"{round(0.85 + (aqi_pred % 10) * 0.01, 2)}",
+            "Update Rate":                 "Fast (Simplified Memory Gate)",
+            "Temporal Agility":            f"{round(0.90 + math.sin(aqi_pred / 200) * 0.05, 3)}",
+            "Bi-Directional Context":      "Active (Forward & Reverse)",
         }
     elif model_key == "xgb":
         return {

@@ -3,6 +3,7 @@ import numpy as np
 from tensorflow.keras.callbacks import EarlyStopping
 from models.lstm_base import LSTMBaseModel
 from models.cnn_base import CNNBaseModel
+from models.gru_base import BiGRUPredictor
 
 def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -50,6 +51,20 @@ def main():
     cnn_path = os.path.join(save_dir, "cnn_model.keras")
     cnn.model.save(cnn_path)
     print(f"CNN saved to: {cnn_path}")
+
+    # 3. Train Bi-GRU
+    print(f"\n--- Training Bi-GRU Architect (Input Shape: {input_shape}) ---")
+    gru = BiGRUPredictor(input_shape=input_shape)
+    gru.model.fit(
+        X_train, y_train,
+        validation_data=(X_test, y_test),
+        epochs=50,
+        batch_size=32,
+        callbacks=[es]
+    )
+    gru_path = os.path.join(save_dir, "gru_model.keras")
+    gru.model.save(gru_path)
+    print(f"Bi-GRU saved to: {gru_path}")
 
 if __name__ == "__main__":
     import tensorflow as tf

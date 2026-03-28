@@ -4,6 +4,7 @@ from logic_layer import inverse_transform_aqi
 from models.xgb_base import XGBBaseModel
 from models.lstm_base import LSTMBaseModel
 from models.cnn_base import CNNBaseModel
+from models.gru_base import BiGRUPredictor
 
 def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +18,8 @@ def main():
     xgb = XGBBaseModel()
     lstm = LSTMBaseModel()
     cnn = CNNBaseModel()
-    
+    gru = BiGRUPredictor()
+
     print("Generating predictions...")
     
     meta_X = []
@@ -26,6 +28,7 @@ def main():
     # Batch prediction
     lstm_preds_scaled = lstm.model.predict(X_test, verbose=0)
     cnn_preds_scaled = cnn.model.predict(X_test, verbose=0)
+    gru_preds_scaled = gru.model.predict(X_test, verbose=0)
     
     for i in range(len(X_test)):
         x_i = X_test[i:i+1]
@@ -33,10 +36,11 @@ def main():
         
         p_lstm = inverse_transform_aqi(float(lstm_preds_scaled[i][0]))
         p_cnn = inverse_transform_aqi(float(cnn_preds_scaled[i][0]))
+        p_gru = inverse_transform_aqi(float(gru_preds_scaled[i][0]))
         
         true_aqi = inverse_transform_aqi(float(y_test_scaled[i]))
         
-        meta_X.append([p_xgb, p_lstm, p_cnn])
+        meta_X.append([p_xgb, p_lstm, p_cnn, p_gru])
         meta_y.append(true_aqi)
         
     meta_X = np.array(meta_X)

@@ -253,8 +253,8 @@ export default function LittleAheadPage() {
                     <div className="flex flex-col gap-6 mb-6">
                         <MethodCard
                             methodNumber={5}
-                            title="LSTM"
-                            subtitle="Long-Term Temporal Memory"
+                            title="Bi-LSTM"
+                            subtitle="Bidirectional Temporal Memory"
                             aqi={metaResult?.lstm_aqi ?? null}
                             trend={metaResult?.trend ?? null}
                             insight={metaResult?.insights?.lstm ?? null}
@@ -263,12 +263,12 @@ export default function LittleAheadPage() {
                         />
                         <MethodCard
                             methodNumber={6}
-                            title="1D-CNN"
-                            subtitle="Localized Pattern Recognition"
-                            aqi={metaResult?.cnn_aqi ?? null}
+                            title="Bi-GRU"
+                            subtitle="Gated Sequential Prediction Stream"
+                            aqi={metaResult?.gru_aqi ?? null}
                             trend={metaResult?.trend ?? null}
-                            insight={metaResult?.insights?.cnn ?? null}
-                            neuralInsights={metaResult?.neural_insights?.cnn ?? null}
+                            insight={metaResult?.insights?.gru ?? null}
+                            neuralInsights={metaResult?.neural_insights?.gru ?? null}
                             loading={loading}
                         />
                     </div>
