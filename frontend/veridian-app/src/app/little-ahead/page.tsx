@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import PredictionGrid, { PredictionResult } from "@/components/PredictionGrid";
 import MetaLearnerHeroCard from "@/components/MetaLearnerHeroCard";
+import Leaderboard from "@/components/Leaderboard";
 import MethodCard from "@/components/MethodCard";
 
 /* =========================================== */
@@ -239,6 +240,9 @@ export default function LittleAheadPage() {
                         <MetaLearnerHeroCard data={metaResult} loading={loading} variant="B" />
                     </div>
                 )}
+
+                {/* PERFORMANCE VALIDATION TIER */}
+                <Leaderboard />
 
                 <PredictionGrid
                     result={result}
