@@ -2,7 +2,7 @@ import os
 import numpy as np
 from tensorflow.keras.callbacks import EarlyStopping
 from models.lstm_base import LSTMBaseModel
-from models.cnn_base import CNNBaseModel
+from models.tcn_base import TCNPredictor
 from models.gru_base import BiGRUPredictor
 
 def main():
@@ -38,19 +38,19 @@ def main():
     lstm.model.save(lstm_path)
     print(f"LSTM saved to: {lstm_path}")
     
-    # 2. Train CNN
-    print(f"\n--- Training CNN Architect (Input Shape: {input_shape}) ---")
-    cnn = CNNBaseModel(input_shape=input_shape)
-    cnn.model.fit(
+    # 2. Train TCN
+    print(f"\n--- Training TCN Architect (Input Shape: {input_shape}) ---")
+    tcn = TCNPredictor(input_shape=input_shape)
+    tcn.model.fit(
         X_train, y_train,
         validation_data=(X_test, y_test),
         epochs=50,
         batch_size=32,
         callbacks=[es]
     )
-    cnn_path = os.path.join(save_dir, "cnn_model.keras")
-    cnn.model.save(cnn_path)
-    print(f"CNN saved to: {cnn_path}")
+    tcn_path = os.path.join(save_dir, "tcn_model.keras")
+    tcn.model.save(tcn_path)
+    print(f"TCN saved to: {tcn_path}")
 
     # 3. Train Bi-GRU
     print(f"\n--- Training Bi-GRU Architect (Input Shape: {input_shape}) ---")

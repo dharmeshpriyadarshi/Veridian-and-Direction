@@ -58,7 +58,7 @@ def get_derived_insights(model_key: str) -> str:
     insights = {
         "xgb": "Tabular Feature Aggregation: Wind + Lag Correlations",
         "lstm": "Sequence Memory: 168 Hours",
-        "cnn": "Spatial Pattern: High-Frequency Shock Detected",
+        "tcn": "Dilated Temporal Convolutions: 7-Day Context",
         "gru": "Gated Sequential Stream: Lean Agility",
     }
     return insights.get(model_key, "")
@@ -76,16 +76,16 @@ def get_neural_insight_object(model_key: str, aqi_pred: float = 0.0) -> dict:
             "Memory Depth":            "7 Unrolled LSTM Cells",
             "Recursive Stability":     f"{round(abs(math.sin(aqi_pred / 100)) * 0.85 + 0.1, 3)}",
         }
-    elif model_key == "cnn":
+    elif model_key == "tcn":
         intensity_map = { "Good": "Low", "Satisfactory": "Low-Medium",
                           "Moderate": "Medium", "Poor": "High",
                           "Very Poor": "Very High", "Severe": "Critical" }
         cat = get_cpcb_category(aqi_pred)
         return {
-            "Pattern Sharpness":           f"{round(min(aqi_pred / 500 * 100, 99), 1)}%",
-            "Signal Match %":              f"{round(min(aqi_pred / 400 * 100, 98), 1)}%",
-            "Filter Activation (Inversion)": "Conv1D-no_inv",
-            "Shock Detection Intensity":   intensity_map.get(cat, "High"),
+            "Dilation Field":              "rate: [1, 2, 4]",
+            "Receptive Range":             "15 Timesteps (Causal)",
+            "Filter Activation":           "Conv1D-ReLU",
+            "Pattern Detection Intensity": intensity_map.get(cat, "High"),
         }
     elif model_key == "gru":
         return {

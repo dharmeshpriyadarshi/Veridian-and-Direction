@@ -9,14 +9,14 @@ if current_dir not in sys.path:
 try:
     from models.xgb_base import XGBBaseModel
     from models.lstm_base import LSTMBaseModel
-    from models.cnn_base import CNNBaseModel
+    from models.tcn_base import TCNPredictor
     from models.gru_base import BiGRUPredictor
     from models.rf_meta_learner import RFMetaLearner
 except ImportError:
     # If starting from root directory directly
     from ml_engine.models.xgb_base import XGBBaseModel
     from ml_engine.models.lstm_base import LSTMBaseModel
-    from ml_engine.models.cnn_base import CNNBaseModel
+    from ml_engine.models.tcn_base import TCNPredictor
     from ml_engine.models.gru_base import BiGRUPredictor
     from ml_engine.models.rf_meta_learner import RFMetaLearner
 
@@ -30,7 +30,7 @@ class MetaEnsembleOrchestrator:
     def __init__(self):
         self.xgb = XGBBaseModel()
         self.lstm = LSTMBaseModel()
-        self.cnn = CNNBaseModel()
+        self.tcn = TCNPredictor()
         self.gru = BiGRUPredictor()
         self.meta_learner = RFMetaLearner()
         # Ensure path for storing/loading data
@@ -52,7 +52,7 @@ class MetaEnsembleOrchestrator:
         # 1. Base models predict in parallel (stubbed as sequential here)
         xgb_pred = self.xgb.predict(enriched_data)
         lstm_pred_scaled = self.lstm.predict(x_sample) if x_sample is not None else 0.5
-        cnn_pred_scaled = self.cnn.predict(x_sample) if x_sample is not None else 0.5
+        tcn_pred_scaled = self.tcn.predict(x_sample) if x_sample is not None else 0.5
         gru_pred_scaled = self.gru.predict(x_sample) if x_sample is not None else 0.5
         
         # Inverse transform the scaled predictions to real AQI space
@@ -62,14 +62,14 @@ class MetaEnsembleOrchestrator:
             from ml_engine.logic_layer import inverse_transform_aqi
             
         lstm_pred = inverse_transform_aqi(lstm_pred_scaled)
-        cnn_pred = inverse_transform_aqi(cnn_pred_scaled)
+        tcn_pred = inverse_transform_aqi(tcn_pred_scaled)
         gru_pred = inverse_transform_aqi(gru_pred_scaled)
 
-        # 2. Consolidate results
-        meta_input = [xgb_pred, lstm_pred, cnn_pred, gru_pred]
+        # 2. Consolidate results (Order: XGB, LSTM, TCN, GRU based on earlier implementation, but updated prompt specified XGB, LSTM, GRU, TCN which we will synchronize now)
+        meta_input = [xgb_pred, lstm_pred, gru_pred, tcn_pred]
 
         # 3. Pass to Random Forest meta-learner
-        consensus_aqi = self.meta_learner.predict(xgb_pred, lstm_pred, cnn_pred, gru_pred)
+        consensus_aqi = self.meta_learner.predict(xgb_pred, lstm_pred, gru_pred, tcn_pred)
 
         # 4. Logic Layer categorization
         category = get_cpcb_category(consensus_aqi)
@@ -82,8 +82,8 @@ class MetaEnsembleOrchestrator:
         weights = {
             "xgb": round(contributions.get("XGB", 0.25), 4),
             "lstm": round(contributions.get("LSTM", 0.25), 4),
-            "cnn": round(contributions.get("CNN", 0.25), 4),
             "gru": round(contributions.get("GRU", 0.25), 4),
+            "tcn": round(contributions.get("TCN", 0.25), 4),
         }
 
         return {
@@ -92,32 +92,32 @@ class MetaEnsembleOrchestrator:
             "aqi": round(consensus_aqi, 2),
             "xgb_aqi":  round(xgb_pred,  2),
             "lstm_aqi": round(lstm_pred, 2),
-            "cnn_aqi":  round(cnn_pred,  2),
             "gru_aqi":  round(gru_pred,  2),
             "method6_aqi": round(gru_pred, 2),
+            "tcn_aqi":  round(tcn_pred,  2),
+            "method7_aqi": round(tcn_pred, 2),
             "category": category,
             "trend": trend,
             "confidence": 88.5,
             "model_contributions": contributions,
             "weights": weights,
-            # Task 3 audit: verify xgb_pred is at index 0 of meta_input
             "meta_input_audit": {
                 "index_0_xgb": round(xgb_pred,  2),
                 "index_1_lstm": round(lstm_pred, 2),
-                "index_2_cnn":  round(cnn_pred,  2),
-                "index_3_gru":  round(gru_pred,  2),
+                "index_2_gru":  round(gru_pred,  2),
+                "index_3_tcn":  round(tcn_pred,  2),
             },
             "insights": {
                 "xgb":  get_derived_insights("xgb"),
                 "lstm": get_derived_insights("lstm"),
-                "cnn":  get_derived_insights("cnn"),
                 "gru":  get_derived_insights("gru"),
+                "tcn":  get_derived_insights("tcn"),
             },
             # Rich Neural Insight Objects for frontend Stat Block grid
             "neural_insights": {
                 "xgb":  get_neural_insight_object("xgb",  xgb_pred),
                 "lstm": get_neural_insight_object("lstm", lstm_pred),
-                "cnn":  get_neural_insight_object("cnn",  cnn_pred),
                 "gru":  get_neural_insight_object("gru",  gru_pred),
+                "tcn":  get_neural_insight_object("tcn",  tcn_pred),
             }
         }

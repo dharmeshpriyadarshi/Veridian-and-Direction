@@ -13,7 +13,7 @@ interface MetaLearnerHeroCardProps {
 const MODEL_META = {
     xgb: { label: "XGBoost", color: "bg-blue-500", desc: "Tabular meteorological & lag correlations" },
     lstm: { label: "Bi-LSTM", color: "bg-emerald-500", desc: "Long-term 7-day pollution temporal memory" },
-    cnn: { label: "1D-CNN", color: "bg-amber-500", desc: "Localized atmospheric spike pattern detection" },
+    tcn: { label: "TCN Pattern Scanner", color: "bg-amber-500", desc: "Long-range dilated spatial convolutions" },
     gru: { label: "Bi-GRU", color: "bg-purple-500", desc: "Gated Sequential Prediction Stream" },
 };
 
@@ -21,7 +21,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
     const aqi = data?.meta_aqi ?? data?.aqi ?? 0;
     const weights = data?.weights;
     const lstmAqi = data?.lstm_aqi ?? 0;
-    const cnnAqi = data?.cnn_aqi ?? 0;
+    const tcnAqi = data?.tcn_aqi ?? 0;
     const gruAqi = data?.gru_aqi ?? 0;
     const xgbAqi = 150.0; // XGB stub value (matches xgb_base stub)
 
@@ -82,7 +82,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                         Meta-Learner Consensus
                     </span>
                     <span className="ml-auto text-[#E5D7C4]/40 text-xs tracking-widest uppercase">
-                        RF ← XGB · LSTM · GRU · CNN
+                        RF ← XGB · LSTM · GRU · TCN
                     </span>
                 </div>
 
@@ -171,7 +171,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                                 {" "}+{" "}
                                 <span className="text-purple-300">({((weights?.gru ?? 0) * 100).toFixed(1)}% × {gruAqi.toFixed(1)})</span>
                                 {" "}+{" "}
-                                <span className="text-amber-300">({((weights?.cnn ?? 0) * 100).toFixed(1)}% × {cnnAqi.toFixed(1)})</span>
+                                <span className="text-amber-300">({((weights?.tcn ?? 0) * 100).toFixed(1)}% × {tcnAqi.toFixed(1)})</span>
                                 {" "}≈{" "}
                                 <span className="text-[#E5D7C4] font-bold">{aqi.toFixed(1)}</span>
                             </div>
@@ -181,7 +181,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                                 Model Influence Breakdown
                             </p>
                             <div className="flex flex-col gap-3">
-                                {(["xgb", "lstm", "gru", "cnn"] as const).map((key) => {
+                                {(["xgb", "lstm", "gru", "tcn"] as const).map((key) => {
                                     const pct = ((weights?.[key] ?? 0) * 100);
                                     const meta = MODEL_META[key];
 
@@ -190,7 +190,7 @@ export default function MetaLearnerHeroCard({ data, loading }: MetaLearnerHeroCa
                                         "xgb": "#3b82f6", // Deep Blue
                                         "lstm": "#22c55e", // Veridian Green
                                         "gru": "#a855f7", // Purple
-                                        "cnn": "#f59e0b" // Amber/Orange
+                                        "tcn": "#f59e0b" // Amber/Orange
                                     };
 
                                     return (

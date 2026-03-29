@@ -271,6 +271,16 @@ export default function LittleAheadPage() {
                             neuralInsights={metaResult?.neural_insights?.gru ?? null}
                             loading={loading}
                         />
+                        <MethodCard
+                            methodNumber={7}
+                            title="TCN Pattern Scanner"
+                            subtitle="High-Fidelity Spatial Upgrade"
+                            aqi={metaResult?.tcn_aqi ?? null}
+                            trend={metaResult?.trend ?? null}
+                            insight={metaResult?.insights?.tcn ?? null}
+                            neuralInsights={metaResult?.neural_insights?.tcn ?? null}
+                            loading={loading}
+                        />
                     </div>
                 )}
 
