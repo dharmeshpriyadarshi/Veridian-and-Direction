@@ -232,9 +232,12 @@ export default function LittleAheadPage() {
                 {/*  PREDICTION RESULT                           */}
                 {/* ============================================ */}
 
-                {/* META-LEARNER HERO */}
+                {/* META-LEARNER HERO DUAL PATH */}
                 {(loading || metaResult) && (
-                    <MetaLearnerHeroCard data={metaResult} loading={loading} />
+                    <div className="flex flex-col lg:flex-row gap-6 mb-6">
+                        <MetaLearnerHeroCard data={metaResult} loading={loading} variant="A" />
+                        <MetaLearnerHeroCard data={metaResult} loading={loading} variant="B" />
+                    </div>
                 )}
 
                 <PredictionGrid
