@@ -45,7 +45,7 @@ export default function MethodCard({
             <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="glass-panel rounded-3xl p-8 mb-0 animate-pulse h-[260px]"
+                className="glass-panel rounded-3xl p-8 mb-0 animate-pulse h-[260px] w-full"
             />
         );
     }
@@ -65,7 +65,7 @@ export default function MethodCard({
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-panel rounded-3xl p-8 mb-0"
+            className="glass-panel rounded-3xl p-8 mb-0 w-full"
         >
             {/* Header — matches Method 1/2 style */}
             <div className="flex items-center gap-2 text-foreground/40 text-sm uppercase tracking-widest mb-6">

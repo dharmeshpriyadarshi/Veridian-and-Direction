@@ -235,7 +235,7 @@ export default function LittleAheadPage() {
 
                 {/* META-LEARNER HERO DUAL PATH */}
                 {(loading || metaResult) && (
-                    <div className="flex flex-col lg:flex-row gap-6 mb-6">
+                    <div className="flex flex-col gap-y-6 mb-6 w-full">
                         <MetaLearnerHeroCard data={metaResult} loading={loading} variant="A" />
                         <MetaLearnerHeroCard data={metaResult} loading={loading} variant="B" />
                     </div>

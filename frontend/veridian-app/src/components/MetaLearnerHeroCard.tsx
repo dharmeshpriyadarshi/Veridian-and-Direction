@@ -50,7 +50,7 @@ export default function MetaLearnerHeroCard({ data, loading, variant }: MetaLear
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-3xl p-8 mb-6 border border-[#889063] bg-gradient-to-b from-[#354024] to-[#1a2012] animate-pulse h-[280px] flex flex-col justify-center items-center"
+                className="rounded-3xl p-8 mb-6 border border-[#889063] bg-gradient-to-b from-[#354024] to-[#1a2012] animate-pulse h-[280px] flex flex-col justify-center items-center w-full"
             >
                 <div className="w-72 h-5 bg-white/10 rounded mb-10" />
                 <div className="w-32 h-8 bg-white/10 rounded mb-4" />
@@ -78,7 +78,7 @@ export default function MetaLearnerHeroCard({ data, loading, variant }: MetaLear
         <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-3xl border border-[#889063] bg-gradient-to-b from-[#354024] to-[#1a2012] shadow-2xl shadow-[#354024]/20 mb-6 overflow-hidden flex-1"
+            className="rounded-3xl border border-[#889063] bg-gradient-to-b from-[#354024] to-[#1a2012] shadow-2xl shadow-[#354024]/20 mb-6 overflow-hidden w-full"
         >
             <div className="p-8">
                 {/* Header row */}
