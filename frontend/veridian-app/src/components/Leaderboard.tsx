@@ -29,13 +29,23 @@ interface MetaEvalResponse {
 const Leaderboard = () => {
     const [data, setData] = useState<MetaEvalResponse | null>(null);
 
+    const [error, setError] = useState<string | null>(null);
+
     useEffect(() => {
-        fetch('/api/v1/metrics/meta-eval')
-            .then(res => res.json())
-            .then(json => setData(json));
+        fetch('http://127.0.0.1:8000/api/v1/metrics/meta-eval')
+            .then(res => {
+                if (!res.ok) throw new Error("Could not load validation metrics.");
+                return res.json();
+            })
+            .then(json => setData(json))
+            .catch(err => setError(err.message));
     }, []);
 
-    if (!data) return <div className="animate-pulse h-40 bg-[#22c55e]/5 rounded-xl w-full" />;
+    if (error) {
+        return <div className="p-6 my-8 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-400 text-sm">{error}</div>;
+    }
+
+    if (!data) return <div className="animate-pulse h-40 bg-[#22c55e]/5 rounded-xl w-full my-8" />;
 
     const p_value = data.statistical_test.p_value;
     const isSignificant = p_value <= 0.05;
