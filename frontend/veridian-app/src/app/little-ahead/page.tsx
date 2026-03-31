@@ -233,12 +233,14 @@ export default function LittleAheadPage() {
                 {/*  PREDICTION RESULT                           */}
                 {/* ============================================ */}
 
+                <div className="flex flex-col gap-6">
+
                 {/* META-LEARNER HERO DUAL PATH */}
                 {(loading || metaResult) && (
-                    <div className="flex flex-col gap-y-6 mb-6 w-full">
+                    <>
                         <MetaLearnerHeroCard data={metaResult} loading={loading} variant="A" />
                         <MetaLearnerHeroCard data={metaResult} loading={loading} variant="B" />
-                    </div>
+                    </>
                 )}
 
                 {/* PERFORMANCE VALIDATION TIER */}
@@ -255,9 +257,9 @@ export default function LittleAheadPage() {
                     selectedCity={selectedCity}
                 />
 
-                {/* BASE METHOD CARDS — Methods 5 & 6 (Full Width Stacked) */}
+                {/* BASE METHOD CARDS — Methods 5, 6, 7 */}
                 {(loading || metaResult) && (
-                    <div className="flex flex-col gap-6 mb-6">
+                    <>
                         <MethodCard
                             methodNumber={5}
                             title="Bi-LSTM"
@@ -288,8 +290,10 @@ export default function LittleAheadPage() {
                             neuralInsights={metaResult?.neural_insights?.tcn ?? null}
                             loading={loading}
                         />
-                    </div>
+                    </>
                 )}
+
+                </div>
 
                 {/* ============================================ */}
                 {/*  PREDICTION GRID (METHODS 1 & 2 - MASKED)    */}

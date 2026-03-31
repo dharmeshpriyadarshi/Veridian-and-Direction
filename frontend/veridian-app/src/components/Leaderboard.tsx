@@ -48,7 +48,7 @@ const Leaderboard = () => {
     const winner = meta_a.rmse < meta_b.rmse ? 'A' : 'B';
 
     return (
-        <div className="w-full bg-[#1a1c18]/80 border border-white/10 rounded-2xl p-6 my-8 backdrop-blur-md">
+        <div className="w-full bg-[#1a1c18]/80 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
             <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
                 <h3 className="text-xl font-bold text-[#E5D7C4] tracking-tight">Statistical Validation Tier — Historian (A) vs. Scanner (B)</h3>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isSignificant ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'bg-white/10 text-white/40'}`}>
