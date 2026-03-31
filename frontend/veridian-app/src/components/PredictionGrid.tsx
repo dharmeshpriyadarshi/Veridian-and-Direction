@@ -161,6 +161,7 @@ export default function PredictionGrid({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
+                className="flex flex-col gap-6"
             >
                 {/* 
                     ============================================ 
@@ -175,7 +176,7 @@ export default function PredictionGrid({
                 {/*  MODEL 3: SARIMAX (STATISTICAL)              */}
                 {/* ============================================ */}
                 {sarimaxResult && (
-                    <div className="glass-panel rounded-3xl p-8 mb-6">
+                    <div className="glass-panel rounded-3xl p-8">
                         <div className="flex items-center gap-2 text-foreground/40 text-sm uppercase tracking-widest mb-6">
                             <Layers size={14} />
                             Method 3 — SARIMAX Statistical Forecast for {result.prediction.city}
@@ -246,7 +247,7 @@ export default function PredictionGrid({
                 {/*  MODEL 4: XGBOOST (MACHINE LEARNING)         */}
                 {/* ============================================ */}
                 {xgboostResult && (
-                    <div className="glass-panel rounded-3xl p-8 mb-6">
+                    <div className="glass-panel rounded-3xl p-8">
                         <div className="flex items-center gap-2 text-foreground/40 text-sm uppercase tracking-widest mb-6">
                             <Cpu size={14} />
                             Method 4 — XGBoost Machine Learning for {result.prediction.city}
