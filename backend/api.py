@@ -1104,7 +1104,7 @@ async def get_meta_ensemble_prediction(city: str = "Delhi", date: str = None):
             
         from ml_engine.meta_ensemble_orchestrator import MetaEnsembleOrchestrator
         orchestrator = MetaEnsembleOrchestrator()
-        result = orchestrator.predict(enriched_data=None)
+        result = orchestrator.predict(enriched_data=None, city=city, date=date)
         return result
     except Exception as e:
         import traceback

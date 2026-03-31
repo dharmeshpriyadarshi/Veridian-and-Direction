@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 
 // Interfaces for incoming data shape
 interface ModelMetrics {
-    name: string;
     rmse: number;
     mae: number;
     r2: number;
@@ -12,18 +11,10 @@ interface ModelMetrics {
 }
 
 interface MetaEvalResponse {
-    metrics: {
-        A: ModelMetrics;
-        B: ModelMetrics;
-    };
-    statistical_test: {
-        test_name: string;
-        t_statistic: number;
-        p_value: number;
-        is_significant: boolean;
-        interpretation: string;
-    };
-    winner: "A" | "B" | "Tie";
+    evaluated_on: string;
+    p_value: number;
+    meta_a: ModelMetrics;
+    meta_b: ModelMetrics;
 }
 
 const Leaderboard = () => {
@@ -47,12 +38,12 @@ const Leaderboard = () => {
 
     if (!data) return <div className="animate-pulse h-40 bg-[#22c55e]/5 rounded-xl w-full my-8" />;
 
-    const p_value = data.statistical_test.p_value;
+    const p_value = data.p_value;
     const isSignificant = p_value <= 0.05;
     
-    // The metric payload uses "A" and "B" as keys
-    const meta_a = data.metrics.A;
-    const meta_b = data.metrics.B;
+    // The metric payload uses "meta_a" and "meta_b" as keys
+    const meta_a = data.meta_a;
+    const meta_b = data.meta_b;
     
     const winner = meta_a.rmse < meta_b.rmse ? 'A' : 'B';
 
